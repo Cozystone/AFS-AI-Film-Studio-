@@ -1,22 +1,22 @@
 "use client";
 
 import {
+  Activity,
   CheckCircle2,
+  ChevronDown,
   Clapperboard,
   Film,
-  KeyRound,
+  Gauge,
+  Globe2,
   Loader2,
-  Music2,
+  MonitorPlay,
   Play,
-  RefreshCw,
-  Save,
-  Scissors,
   Server,
   Sparkles,
   Wand2,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Project = {
   project_id: string;
@@ -66,8 +66,6 @@ type CineGraph = {
   audio_visual_events: AudioVisualEvent[];
 };
 
-type Language = "en" | "ko";
-
 type SystemUsage = {
   timestamp: string;
   cpu: { usage_percent: number; core_count: number };
@@ -113,12 +111,141 @@ type ShotPreviewResponse = {
   media_url: string;
 };
 
+type Language = "ko" | "en";
+
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
 
 const samplePrompt =
-  "Two teenagers find a strange old camera in an abandoned roadside building. The image on the tape shows something that has not happened yet.";
+  "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.";
 
-const keyframeSlots = ["first", "middle", "last"] as const;
+const copy = {
+  ko: {
+    appName: "AFS",
+    subtitle: "시나리오를 넣고, 컷을 고른 뒤, 프리뷰를 만듭니다.",
+    make: "만들기",
+    preview: "결과",
+    advanced: "고급",
+    language: "언어",
+    statusReady: "준비됨",
+    step1Title: "1. 시나리오 입력",
+    step1Body: "영화 내용을 한 문단으로 적으면 AFS가 장면, 컷, 오디오 이벤트를 자동으로 나눕니다.",
+    title: "제목",
+    script: "시나리오",
+    visualStyle: "영상 스타일",
+    audioStyle: "소리 스타일",
+    createPlan: "자동 기획 만들기",
+    recreatePlan: "다시 기획하기",
+    step2Title: "2. 생성할 컷 선택",
+    step2Body: "먼저 짧은 컷 하나를 선택해서 프리뷰를 확인합니다.",
+    noShots: "아직 컷이 없습니다. 먼저 자동 기획을 만드세요.",
+    shot: "컷",
+    seconds: "초",
+    step3Title: "3. 프리뷰 생성",
+    step3Body: "아래 큰 버튼을 누르면 키프레임, 영상, 오디오, 내보내기를 순서대로 진행합니다.",
+    nextButton: "다음 단계 실행",
+    planFirst: "자동 기획부터 만들기",
+    keyframes: "키프레임 만들기",
+    render: "프리뷰 영상 만들기",
+    audio: "소리 붙이기",
+    export: "내보내기 준비",
+    done: "프리뷰 준비 완료",
+    noPreview: "프리뷰 영상이 여기에 표시됩니다.",
+    selectedShot: "선택한 컷",
+    chunkPlan: "렌더링 구간",
+    audioEvents: "소리 이벤트",
+    progress: "진행 상황",
+    system: "PC 상태",
+    elapsed: "현재 소요",
+    estimated: "예상",
+    remaining: "남은 시간",
+    noJobs: "아직 작업이 없습니다.",
+    cpu: "CPU",
+    gpu: "GPU",
+    memory: "메모리",
+    disk: "디스크",
+    unavailable: "사용 불가",
+    expertOpen: "전문가 정보 열기",
+    expertClose: "전문가 정보 닫기",
+    worldState: "World State",
+    projectJson: "Project JSON",
+    shotJson: "Shot JSON",
+    orchestratorUrl: "Orchestrator URL",
+    saveUrl: "저장",
+    proxyHint: "배포 환경에서는 자동 프록시를 사용합니다. 직접 테스트할 때만 바꾸세요.",
+    missingApiUrl: "Orchestrator URL이 필요합니다.",
+    offline: "오케스트레이터 연결 안 됨",
+    creatingProject: "로컬 프로젝트 생성 중",
+    generatingGraph: "장면과 컷을 구성하는 중",
+    storyboardReady: "자동 기획 완료",
+    keyframeStatus: "키프레임 생성 완료",
+    renderStatus: "프리뷰 영상 생성 완료",
+    audioStatus: "오디오 레이어 생성 완료",
+    exportStatus: "내보내기 메타데이터 준비 완료",
+  },
+  en: {
+    appName: "AFS",
+    subtitle: "Write a script, pick a shot, then generate a preview.",
+    make: "Make",
+    preview: "Preview",
+    advanced: "Advanced",
+    language: "Language",
+    statusReady: "Ready",
+    step1Title: "1. Enter Script",
+    step1Body: "Write one paragraph. AFS turns it into scenes, shots, chunks, and audio events.",
+    title: "Title",
+    script: "Script",
+    visualStyle: "Visual style",
+    audioStyle: "Audio style",
+    createPlan: "Create Plan",
+    recreatePlan: "Recreate Plan",
+    step2Title: "2. Pick a Shot",
+    step2Body: "Start with one short shot and check the preview first.",
+    noShots: "No shots yet. Create a plan first.",
+    shot: "Shot",
+    seconds: "sec",
+    step3Title: "3. Generate Preview",
+    step3Body: "Use the large button to run keyframes, video, audio, and export in order.",
+    nextButton: "Run Next Step",
+    planFirst: "Create plan first",
+    keyframes: "Generate keyframes",
+    render: "Generate preview video",
+    audio: "Add audio",
+    export: "Prepare export",
+    done: "Preview ready",
+    noPreview: "Your preview video will appear here.",
+    selectedShot: "Selected shot",
+    chunkPlan: "Render chunks",
+    audioEvents: "Audio events",
+    progress: "Progress",
+    system: "PC status",
+    elapsed: "Elapsed",
+    estimated: "Estimated",
+    remaining: "Remaining",
+    noJobs: "No jobs yet.",
+    cpu: "CPU",
+    gpu: "GPU",
+    memory: "Memory",
+    disk: "Disk",
+    unavailable: "Unavailable",
+    expertOpen: "Show expert details",
+    expertClose: "Hide expert details",
+    worldState: "World State",
+    projectJson: "Project JSON",
+    shotJson: "Shot JSON",
+    orchestratorUrl: "Orchestrator URL",
+    saveUrl: "Save",
+    proxyHint: "Hosted builds use the proxy automatically. Override only for direct local tests.",
+    missingApiUrl: "Set an orchestrator URL first.",
+    offline: "Orchestrator offline",
+    creatingProject: "Creating local project",
+    generatingGraph: "Building scenes and shots",
+    storyboardReady: "Plan ready",
+    keyframeStatus: "Keyframes ready",
+    renderStatus: "Preview video ready",
+    audioStatus: "Audio layers ready",
+    exportStatus: "Export metadata ready",
+  },
+} satisfies Record<Language, Record<string, string>>;
 
 function initialOrchestratorUrl() {
   if (configuredApiBase) {
@@ -127,190 +254,12 @@ function initialOrchestratorUrl() {
   if (typeof window === "undefined") {
     return "";
   }
-  const saved = window.localStorage.getItem("afs.orchestratorUrl");
-  if (saved) {
-    return saved;
-  }
-  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? "/api/orchestrator"
-    : "";
+  return window.localStorage.getItem("afs.orchestratorUrl") ?? "";
 }
-
-const translations = {
-  en: {
-    subtitle: "Local-first cinematic generation workspace",
-    projectIntake: "Project Intake",
-    title: "Title",
-    scriptPrompt: "Script Prompt",
-    visualStyle: "Visual Style",
-    audioStyle: "Audio Style",
-    createCineGraph: "Create CineGraph",
-    sceneShotTree: "Scene / Shot Tree",
-    emptyShots: "Create a project to generate shots.",
-    noProject: "no project",
-    storyboardTimeline: "Storyboard Timeline",
-    keyframes: "Keyframes",
-    render: "Render",
-    audio: "Audio",
-    export: "Export",
-    first: "first",
-    middle: "middle",
-    last: "last",
-    keyframeSlot: "Mock keyframe slot",
-    chunkTimeline: "Chunk Timeline",
-    complexity: "complexity",
-    videoPreview: "Video Preview",
-    previewText: "MockRenderer writes placeholder chunks to local storage.",
-    noPreview: "Render a shot to generate a preview.",
-    previewUnavailable: "Preview media is not available yet.",
-    evaluatorRepair: "Evaluator / Repair",
-    promptMatch: "Prompt Match 82",
-    cameraMatch: "Camera Match 72",
-    artifactRisk: "Artifact Risk 18",
-    runState: "Run State",
-    worldState: "World State",
-    selectedShot: "Selected Shot",
-    audioEvents: "Audio Events",
-    noData: "No data yet",
-    language: "Language",
-    systemUsage: "System Usage",
-    renderQueue: "Render Queue",
-    progress: "Progress",
-    elapsed: "Elapsed",
-    estimated: "Estimated",
-    remaining: "Remaining",
-    noJobs: "No jobs yet.",
-    workflow: "Workflow",
-    guide: "Guide",
-    guideStart: "Start on the left: enter a script and create the CineGraph.",
-    guideSelect: "Use the shot tree to choose the cut you want to work on.",
-    guideWork: "Use the center panel for keyframes, render, preview, audio, and export.",
-    guideInspect: "Use the right panel to monitor status, jobs, system usage, world state, and audio events.",
-    navStart: "Start",
-    navStoryboard: "Storyboard",
-    navMonitor: "Monitor",
-    nextAction: "Next Action",
-    stepProject: "Project",
-    stepShot: "Shot",
-    stepKeyframes: "Keyframes",
-    stepRender: "Render",
-    stepAudio: "Audio",
-    stepExport: "Export",
-    actionCreate: "Create the project plan first.",
-    actionSelectShot: "Select a shot from the shot tree.",
-    actionKeyframes: "Generate keyframes for the selected shot.",
-    actionRender: "Render the selected shot.",
-    actionAudio: "Add mock audio layers.",
-    actionExport: "Export the project metadata.",
-    actionDone: "Preview is ready. Continue refining or export.",
-    cpu: "CPU",
-    gpu: "GPU",
-    memory: "Memory",
-    disk: "Disk",
-    unavailable: "Unavailable",
-    offline: "Orchestrator offline",
-    orchestratorUrl: "Orchestrator URL",
-    localOnlyHint: "AFS uses the hosted proxy automatically. Override this only for direct local testing.",
-    saveUrl: "Save URL",
-    missingApiUrl: "Set an orchestrator URL first.",
-    ready: "Ready",
-    creatingProject: "Creating local project",
-    generatingGraph: "Generating CineGraph",
-    storyboardReady: "Storyboard ready",
-    keyframeStatus: "Keyframe sidecars written",
-    renderStatus: "Mock video chunks rendered",
-    audioStatus: "Mock audio layers rendered",
-    exportStatus: "Mock export metadata ready",
-  },
-  ko: {
-    subtitle: "로컬 우선 영화형 생성 워크스페이스",
-    projectIntake: "프로젝트 입력",
-    title: "제목",
-    scriptPrompt: "시나리오 프롬프트",
-    visualStyle: "비주얼 스타일",
-    audioStyle: "오디오 스타일",
-    createCineGraph: "CineGraph 생성",
-    sceneShotTree: "씬 / 샷 트리",
-    emptyShots: "프로젝트를 만들면 샷이 생성됩니다.",
-    noProject: "프로젝트 없음",
-    storyboardTimeline: "스토리보드 타임라인",
-    keyframes: "키프레임",
-    render: "렌더",
-    audio: "오디오",
-    export: "내보내기",
-    first: "첫 장면",
-    middle: "중간",
-    last: "마지막",
-    keyframeSlot: "Mock 키프레임 슬롯",
-    chunkTimeline: "청크 타임라인",
-    complexity: "복잡도",
-    videoPreview: "비디오 프리뷰",
-    previewText: "MockRenderer가 로컬 저장소에 placeholder 청크를 기록합니다.",
-    noPreview: "샷을 렌더하면 프리뷰가 표시됩니다.",
-    previewUnavailable: "아직 프리뷰 미디어가 없습니다.",
-    evaluatorRepair: "평가기 / 리페어",
-    promptMatch: "프롬프트 일치 82",
-    cameraMatch: "카메라 일치 72",
-    artifactRisk: "아티팩트 위험 18",
-    runState: "실행 상태",
-    worldState: "월드 상태",
-    selectedShot: "선택된 샷",
-    audioEvents: "오디오 이벤트",
-    noData: "아직 데이터 없음",
-    language: "언어",
-    systemUsage: "시스템 사용량",
-    renderQueue: "렌더 큐",
-    progress: "진행률",
-    elapsed: "현재 소요",
-    estimated: "예상 소요",
-    remaining: "남은 시간",
-    noJobs: "아직 작업이 없습니다.",
-    workflow: "생성 순서",
-    guide: "초보자 가이드",
-    guideStart: "왼쪽에서 시작하세요. 시나리오를 입력하고 CineGraph를 생성합니다.",
-    guideSelect: "샷 트리에서 작업할 컷을 선택합니다.",
-    guideWork: "가운데에서 키프레임, 렌더, 프리뷰, 오디오, 내보내기를 진행합니다.",
-    guideInspect: "오른쪽에서 상태, 작업 큐, 시스템 사용량, 월드 상태, 오디오 이벤트를 확인합니다.",
-    navStart: "시작",
-    navStoryboard: "스토리보드",
-    navMonitor: "모니터링",
-    nextAction: "다음 단계",
-    stepProject: "프로젝트",
-    stepShot: "샷 선택",
-    stepKeyframes: "키프레임",
-    stepRender: "렌더",
-    stepAudio: "오디오",
-    stepExport: "내보내기",
-    actionCreate: "먼저 프로젝트 계획을 생성하세요.",
-    actionSelectShot: "샷 트리에서 샷을 선택하세요.",
-    actionKeyframes: "선택한 샷의 키프레임을 생성하세요.",
-    actionRender: "선택한 샷을 렌더하세요.",
-    actionAudio: "Mock 오디오 레이어를 추가하세요.",
-    actionExport: "프로젝트 메타데이터를 내보내세요.",
-    actionDone: "프리뷰가 준비됐습니다. 계속 수정하거나 내보내세요.",
-    cpu: "CPU",
-    gpu: "GPU",
-    memory: "메모리",
-    disk: "디스크",
-    unavailable: "사용 불가",
-    offline: "오케스트레이터 오프라인",
-    orchestratorUrl: "Orchestrator URL",
-    localOnlyHint: "AFS가 호스팅 프록시를 자동 사용합니다. 직접 로컬 테스트할 때만 바꾸세요.",
-    saveUrl: "URL 저장",
-    missingApiUrl: "먼저 orchestrator URL을 설정하세요.",
-    ready: "준비됨",
-    creatingProject: "로컬 프로젝트 생성 중",
-    generatingGraph: "CineGraph 생성 중",
-    storyboardReady: "스토리보드 준비 완료",
-    keyframeStatus: "키프레임 sidecar 기록 완료",
-    renderStatus: "Mock 비디오 청크 렌더 완료",
-    audioStatus: "Mock 오디오 레이어 렌더 완료",
-    exportStatus: "Mock export metadata 준비 완료",
-  },
-} satisfies Record<Language, Record<string, string>>;
 
 export default function Home() {
   const [language, setLanguage] = useState<Language>("ko");
+  const t = copy[language];
   const [orchestratorUrl, setOrchestratorUrl] = useState(initialOrchestratorUrl);
   const [orchestratorInput, setOrchestratorInput] = useState(initialOrchestratorUrl);
   const [title, setTitle] = useState("Last Tape");
@@ -320,15 +269,15 @@ export default function Home() {
   const [project, setProject] = useState<Project | null>(null);
   const [graph, setGraph] = useState<CineGraph | null>(null);
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
-  const [status, setStatus] = useState(translations.ko.ready);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [status, setStatus] = useState(t.statusReady);
   const [busy, setBusy] = useState(false);
   const [usage, setUsage] = useState<SystemUsage | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const t = translations[language];
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const selectedShot = graph?.shots.find((shot) => shot.shot_id === selectedShotId) ?? graph?.shots[0];
+  const selectedShot = graph?.shots.find((shot) => shot.shot_id === selectedShotId) ?? graph?.shots[0] ?? null;
   const selectedChunks = useMemo(
     () => graph?.chunks.filter((chunk) => chunk.shot_id === selectedShot?.shot_id) ?? [],
     [graph, selectedShot?.shot_id],
@@ -337,56 +286,48 @@ export default function Home() {
     () => graph?.audio_visual_events.filter((event) => event.shot_id === selectedShot?.shot_id) ?? [],
     [graph, selectedShot?.shot_id],
   );
-  const latestKeyframeJob = jobs.find((job) => job.type === "GENERATE_KEYFRAME" && job.target_id === selectedShot?.shot_id && job.status === "succeeded");
-  const latestRenderJob = jobs.find((job) => job.type === "STITCH_SHOT" && job.target_id === selectedShot?.shot_id && job.status === "succeeded");
-  const latestAudioJob = jobs.find((job) => job.type === "RENDER_AUDIO_LAYER" && job.target_id === selectedShot?.shot_id && job.status === "succeeded");
-  const latestExportJob = jobs.find((job) => job.type === "EXPORT_PROJECT" && job.project_id === project?.project_id && job.status === "succeeded");
-  const workflowSteps = [
-    { key: "project", label: t.stepProject, done: Boolean(project && graph), active: !graph },
-    { key: "shot", label: t.stepShot, done: Boolean(selectedShot), active: Boolean(graph && !selectedShot) },
-    { key: "keyframes", label: t.stepKeyframes, done: Boolean(latestKeyframeJob), active: Boolean(selectedShot && !latestKeyframeJob) },
-    { key: "render", label: t.stepRender, done: Boolean(latestRenderJob || previewUrl), active: Boolean(latestKeyframeJob && !latestRenderJob && !previewUrl) },
-    { key: "audio", label: t.stepAudio, done: Boolean(latestAudioJob), active: Boolean((latestRenderJob || previewUrl) && !latestAudioJob) },
-    { key: "export", label: t.stepExport, done: Boolean(latestExportJob), active: Boolean(latestAudioJob && !latestExportJob) },
-  ];
-  const nextAction = !graph
-    ? t.actionCreate
-    : !selectedShot
-      ? t.actionSelectShot
-      : !latestKeyframeJob
-        ? t.actionKeyframes
-        : !latestRenderJob && !previewUrl
-          ? t.actionRender
-          : !latestAudioJob
-            ? t.actionAudio
-            : !latestExportJob
-              ? t.actionExport
-              : t.actionDone;
 
-  const request = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
-    if (!orchestratorUrl) {
-      throw new Error(t.missingApiUrl);
-    }
-    const response = await fetch(`${orchestratorUrl}${path}`, {
-      headers: { "Content-Type": "application/json" },
-      ...init,
-    });
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-    return response.json();
-  }, [orchestratorUrl, t.missingApiUrl]);
+  const latestKeyframeJob = jobs.find(
+    (job) => job.type === "GENERATE_KEYFRAME" && job.target_id === selectedShot?.shot_id && job.status === "succeeded",
+  );
+  const latestRenderJob = jobs.find(
+    (job) => job.type === "STITCH_SHOT" && job.target_id === selectedShot?.shot_id && job.status === "succeeded",
+  );
+  const latestAudioJob = jobs.find(
+    (job) => job.type === "RENDER_AUDIO_LAYER" && job.target_id === selectedShot?.shot_id && job.status === "succeeded",
+  );
+  const latestExportJob = jobs.find(
+    (job) => job.type === "EXPORT_PROJECT" && job.project_id === project?.project_id && job.status === "succeeded",
+  );
 
-  function saveOrchestratorUrl() {
-    const normalized = orchestratorInput.trim().replace(/\/$/, "");
-    setOrchestratorUrl(normalized);
-    if (normalized) {
-      window.localStorage.setItem("afs.orchestratorUrl", normalized);
-    } else {
-      window.localStorage.removeItem("afs.orchestratorUrl");
-    }
-    setStatus(normalized ? `${t.orchestratorUrl}: ${normalized}` : t.missingApiUrl);
-  }
+  const currentAction = !graph
+    ? t.planFirst
+    : !latestKeyframeJob
+      ? t.keyframes
+      : !latestRenderJob && !previewUrl
+        ? t.render
+        : !latestAudioJob
+          ? t.audio
+          : !latestExportJob
+            ? t.export
+            : t.done;
+
+  const request = useCallback(
+    async <T,>(path: string, init?: RequestInit): Promise<T> => {
+      if (!orchestratorUrl) {
+        throw new Error(copy[language].missingApiUrl);
+      }
+      const response = await fetch(`${orchestratorUrl}${path}`, {
+        headers: { "Content-Type": "application/json" },
+        ...init,
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
+    [language, orchestratorUrl],
+  );
 
   useEffect(() => {
     let active = true;
@@ -394,7 +335,7 @@ export default function Home() {
     async function loadUsage() {
       if (!orchestratorUrl) {
         setUsage(null);
-        setUsageError(t.localOnlyHint);
+        setUsageError(t.proxyHint);
         return;
       }
       try {
@@ -417,7 +358,7 @@ export default function Home() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [orchestratorUrl, request, t.localOnlyHint, t.offline]);
+  }, [orchestratorUrl, request, t.offline, t.proxyHint]);
 
   useEffect(() => {
     let active = true;
@@ -473,9 +414,19 @@ export default function Home() {
     };
   }, [latestRenderJob, orchestratorUrl, request, selectedShot]);
 
-  async function createAndPlan(event: FormEvent) {
-    event.preventDefault();
+  function saveOrchestratorUrl() {
+    const normalized = orchestratorInput.trim().replace(/\/$/, "");
+    setOrchestratorUrl(normalized);
+    if (normalized) {
+      window.localStorage.setItem("afs.orchestratorUrl", normalized);
+    } else {
+      window.localStorage.removeItem("afs.orchestratorUrl");
+    }
+  }
+
+  async function createAndPlan() {
     setBusy(true);
+    setPreviewUrl(null);
     try {
       setStatus(t.creatingProject);
       const created = await request<{ project_id: string }>("/api/projects", {
@@ -507,7 +458,7 @@ export default function Home() {
     if (!selectedShot) return;
     setBusy(true);
     try {
-      setStatus(`Generating keyframe slots for ${selectedShot.shot_id}`);
+      setStatus(`${selectedShot.shot_id} ${t.keyframes}`);
       await request(`/api/shots/${selectedShot.shot_id}/keyframes/generate`, {
         method: "POST",
         body: JSON.stringify({ slots: ["first", "middle", "last"], renderer: "mock" }),
@@ -524,7 +475,7 @@ export default function Home() {
     if (!selectedShot) return;
     setBusy(true);
     try {
-      setStatus(`Rendering ${selectedShot.shot_id} with MockRenderer`);
+      setStatus(`${selectedShot.shot_id} ${t.render}`);
       const rendered = await request<RenderShotResponse>(`/api/shots/${selectedShot.shot_id}/render`, {
         method: "POST",
         body: JSON.stringify({ preset: "preview", renderer: "mock", audio: true }),
@@ -544,7 +495,7 @@ export default function Home() {
     if (!selectedShot) return;
     setBusy(true);
     try {
-      setStatus(`Rendering audio layers for ${selectedShot.shot_id}`);
+      setStatus(`${selectedShot.shot_id} ${t.audio}`);
       await request(`/api/shots/${selectedShot.shot_id}/audio/render`, {
         method: "POST",
         body: JSON.stringify({ layers: ["foley", "ambience", "music"], adapter: "mock_audio" }),
@@ -561,7 +512,7 @@ export default function Home() {
     if (!project) return;
     setBusy(true);
     try {
-      setStatus("Writing export metadata");
+      setStatus(t.export);
       await request(`/api/projects/${project.project_id}/export`, {
         method: "POST",
         body: JSON.stringify({ format: "mp4", resolution: "1280x720", include_audio: true }),
@@ -574,108 +525,243 @@ export default function Home() {
     }
   }
 
+  async function runNextStep() {
+    if (!graph) {
+      await createAndPlan();
+      return;
+    }
+    if (!latestKeyframeJob) {
+      await generateKeyframes();
+      return;
+    }
+    if (!latestRenderJob && !previewUrl) {
+      await renderShot();
+      return;
+    }
+    if (!latestAudioJob) {
+      await renderAudio();
+      return;
+    }
+    if (!latestExportJob) {
+      await exportProject();
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#0b0d10] text-slate-100">
-      <header className="border-b border-slate-800 bg-[#11151b]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+      <header className="sticky top-0 z-20 border-b border-slate-800 bg-[#0b0d10]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-emerald-500 text-slate-950">
+            <div className="grid size-10 place-items-center rounded-md bg-emerald-400 text-slate-950">
               <Clapperboard size={22} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold">AFS - AI Film Studio</h1>
+              <h1 className="text-lg font-semibold">{t.appName}</h1>
               <p className="text-sm text-slate-400">{t.subtitle}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <nav className="hidden items-center gap-1 rounded-md border border-slate-700 p-1 text-sm md:flex">
-              <a href="#start" className="rounded px-3 py-1.5 text-slate-300 hover:bg-slate-800">{t.navStart}</a>
-              <a href="#storyboard" className="rounded px-3 py-1.5 text-slate-300 hover:bg-slate-800">{t.navStoryboard}</a>
-              <a href="#monitor" className="rounded px-3 py-1.5 text-slate-300 hover:bg-slate-800">{t.navMonitor}</a>
-            </nav>
-            <div className="flex items-center rounded-md border border-slate-700 p-1 text-sm">
-              <button
-                onClick={() => setLanguage("ko")}
-                className={`h-7 rounded px-3 ${language === "ko" ? "bg-emerald-400 text-slate-950" : "text-slate-300"}`}
-                title={t.language}
-              >
-                KO
-              </button>
-              <button
-                onClick={() => setLanguage("en")}
-                className={`h-7 rounded px-3 ${language === "en" ? "bg-emerald-400 text-slate-950" : "text-slate-300"}`}
-                title={t.language}
-              >
-                EN
-              </button>
-            </div>
-            <div className="flex items-center gap-2 rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-300">
-              <Server size={16} />
-              <span>{orchestratorUrl || t.missingApiUrl}</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <a className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800" href="#make">
+              {t.make}
+            </a>
+            <a className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800" href="#preview">
+              {t.preview}
+            </a>
+            <button
+              className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-200"
+              type="button"
+              onClick={() => setLanguage((current) => (current === "ko" ? "en" : "ko"))}
+            >
+              <Globe2 size={15} />
+              {language === "ko" ? "KO" : "EN"}
+            </button>
           </div>
         </div>
       </header>
 
-      <section className="border-b border-slate-800 bg-[#0d1117]">
-        <div className="mx-auto max-w-7xl px-5 py-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-slate-200">{t.workflow}</p>
-              <p className="text-sm text-emerald-300">{t.nextAction}: {nextAction}</p>
-            </div>
-            <PrimaryWorkflowAction
-              t={t}
-              busy={busy}
-              graphReady={Boolean(graph)}
-              selectedShot={Boolean(selectedShot)}
-              keyframesDone={Boolean(latestKeyframeJob)}
-              renderDone={Boolean(latestRenderJob || previewUrl)}
-              audioDone={Boolean(latestAudioJob)}
-              exportDone={Boolean(latestExportJob)}
-              onCreate={(event) => createAndPlan(event)}
-              onKeyframes={generateKeyframes}
-              onRender={renderShot}
-              onAudio={renderAudio}
-              onExport={exportProject}
-            />
-          </div>
-          <div className="grid gap-2 md:grid-cols-6">
-            {workflowSteps.map((step, index) => (
-              <div
-                key={step.key}
-                className={`rounded-md border px-3 py-2 ${
-                  step.done
-                    ? "border-emerald-400 bg-emerald-400/10"
-                    : step.active
-                      ? "border-amber-300 bg-amber-300/10"
-                      : "border-slate-800 bg-[#11151b]"
-                }`}
-              >
-                <p className="font-mono text-xs text-slate-500">{String(index + 1).padStart(2, "0")}</p>
-                <p className="text-sm font-medium text-slate-100">{step.label}</p>
-              </div>
-            ))}
+      <section className="border-b border-slate-800 bg-[#10151c]">
+        <div className="mx-auto grid max-w-7xl gap-3 px-4 py-4 md:grid-cols-4">
+          <StepPill number="1" label={t.step1Title} done={Boolean(graph)} active={!graph} />
+          <StepPill number="2" label={t.step2Title} done={Boolean(selectedShot)} active={Boolean(graph && !selectedShot)} />
+          <StepPill number="3" label={t.step3Title} done={Boolean(previewUrl)} active={Boolean(selectedShot && !previewUrl)} />
+          <div className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+            <p className="text-xs text-slate-500">{t.progress}</p>
+            <p className="truncate text-sm text-emerald-300">{status}</p>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[340px_1fr_340px]">
-        <section id="start" className="space-y-4 scroll-mt-24">
-          <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <h2 className="mb-3 font-medium">{t.guide}</h2>
-            <ol className="space-y-2 text-sm text-slate-300">
-              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideStart}</li>
-              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideSelect}</li>
-              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideWork}</li>
-              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideInspect}</li>
-            </ol>
-          </section>
+      <div id="make" className="mx-auto grid max-w-7xl gap-4 px-4 py-5 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="space-y-4">
+          <Panel title={t.step1Title} description={t.step1Body} icon={<Wand2 size={18} className="text-emerald-300" />}>
+            <div className="grid gap-3">
+              <label className="text-sm text-slate-300">
+                {t.title}
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="mt-1 h-11 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
+                />
+              </label>
+              <label className="text-sm text-slate-300">
+                {t.script}
+                <textarea
+                  value={scriptPrompt}
+                  onChange={(event) => setScriptPrompt(event.target.value)}
+                  rows={7}
+                  className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-3 text-slate-100 outline-none focus:border-emerald-400"
+                />
+              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-sm text-slate-300">
+                  {t.visualStyle}
+                  <input
+                    value={styleHint}
+                    onChange={(event) => setStyleHint(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300">
+                  {t.audioStyle}
+                  <input
+                    value={audioHint}
+                    onChange={(event) => setAudioHint(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
+                  />
+                </label>
+              </div>
+              <button
+                className="flex h-12 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 font-semibold text-slate-950 disabled:opacity-60"
+                disabled={busy}
+                type="button"
+                onClick={createAndPlan}
+              >
+                {busy && !graph ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                {graph ? t.recreatePlan : t.createPlan}
+              </button>
+            </div>
+          </Panel>
 
-          <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <label className="block text-sm text-slate-300">
-              {t.orchestratorUrl}
-              <div className="mt-1 flex gap-2">
+          <Panel title={t.step2Title} description={t.step2Body} icon={<Film size={18} className="text-sky-300" />}>
+            {graph ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {graph.shots.map((shot, index) => (
+                  <button
+                    key={shot.shot_id}
+                    className={`rounded-md border p-3 text-left transition ${
+                      selectedShot?.shot_id === shot.shot_id
+                        ? "border-emerald-400 bg-emerald-400/10"
+                        : "border-slate-800 bg-[#0b0d10] hover:border-slate-600"
+                    }`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedShotId(shot.shot_id);
+                      setPreviewUrl(null);
+                    }}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs text-slate-500">
+                        {t.shot} {index + 1}
+                      </span>
+                      <span className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-400">
+                        {shot.duration}s
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-slate-100">{shot.purpose}</p>
+                    <p className="mt-2 line-clamp-2 text-xs text-slate-500">{shot.visual_action}</p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text={t.noShots} />
+            )}
+          </Panel>
+        </section>
+
+        <section id="preview" className="space-y-4">
+          <Panel title={t.step3Title} description={t.step3Body} icon={<MonitorPlay size={18} className="text-amber-300" />}>
+            <div className="mb-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+              <p className="text-xs text-slate-500">{t.selectedShot}</p>
+              <p className="mt-1 text-base font-semibold text-slate-100">{selectedShot?.shot_id ?? "-"}</p>
+              <p className="mt-1 text-sm text-slate-400">{selectedShot?.purpose ?? t.noShots}</p>
+            </div>
+
+            <button
+              className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 font-semibold text-slate-950 disabled:opacity-60"
+              disabled={busy || Boolean(graph && !selectedShot)}
+              type="button"
+              onClick={runNextStep}
+            >
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
+              {currentAction === t.done ? t.done : `${t.nextButton}: ${currentAction}`}
+            </button>
+
+            <div className="overflow-hidden rounded-md border border-slate-800 bg-black">
+              {previewUrl ? (
+                <video key={previewUrl} controls className="aspect-video w-full bg-black" src={previewUrl} />
+              ) : (
+                <div className="grid aspect-video place-items-center p-6 text-center text-sm text-slate-500">
+                  <div>
+                    <MonitorPlay className="mx-auto mb-3 text-slate-700" size={36} />
+                    {t.noPreview}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          <Panel title={t.progress} icon={<Activity size={18} className="text-violet-300" />}>
+            <JobProgressPanel jobs={jobs} t={t} />
+          </Panel>
+
+          <Panel title={t.system} icon={<Gauge size={18} className="text-rose-300" />}>
+            <SystemUsagePanel usage={usage} error={usageError} t={t} />
+          </Panel>
+        </section>
+      </div>
+
+      <section className="mx-auto max-w-7xl px-4 pb-8">
+        <button
+          className="flex h-11 w-full items-center justify-between rounded-md border border-slate-800 bg-[#11151b] px-4 text-left text-sm font-medium text-slate-200"
+          type="button"
+          onClick={() => setAdvancedOpen((current) => !current)}
+        >
+          <span>{advancedOpen ? t.expertClose : t.expertOpen}</span>
+          <ChevronDown className={advancedOpen ? "rotate-180 transition" : "transition"} size={18} />
+        </button>
+
+        {advancedOpen ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <Panel title={t.chunkPlan}>
+              <div className="space-y-2">
+                {selectedChunks.map((chunk) => (
+                  <div key={chunk.chunk_id} className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm">
+                    <p className="font-mono text-xs text-emerald-300">{chunk.chunk_id}</p>
+                    <p className="mt-1 text-slate-300">
+                      {chunk.start}s - {chunk.end}s / complexity {chunk.complexity}
+                    </p>
+                  </div>
+                ))}
+                {selectedChunks.length === 0 ? <EmptyState text="-" /> : null}
+              </div>
+            </Panel>
+
+            <Panel title={t.audioEvents}>
+              <div className="space-y-2">
+                {selectedEvents.map((event) => (
+                  <div key={event.event_id} className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm">
+                    <p className="font-mono text-xs text-slate-500">
+                      {event.time}s / {event.audio.type}
+                    </p>
+                    <p className="mt-1 text-slate-200">{event.audio.description}</p>
+                  </div>
+                ))}
+                {selectedEvents.length === 0 ? <EmptyState text="-" /> : null}
+              </div>
+            </Panel>
+
+            <Panel title={t.orchestratorUrl} icon={<Server size={18} className="text-slate-300" />}>
+              <div className="flex gap-2">
                 <input
                   value={orchestratorInput}
                   onChange={(event) => setOrchestratorInput(event.target.value)}
@@ -683,295 +769,75 @@ export default function Home() {
                   className="min-w-0 flex-1 rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
                 />
                 <button
+                  className="rounded-md bg-emerald-400 px-3 text-sm font-semibold text-slate-950"
                   type="button"
                   onClick={saveOrchestratorUrl}
-                  className="h-10 rounded-md bg-emerald-400 px-3 text-sm font-medium text-slate-950"
                 >
                   {t.saveUrl}
                 </button>
               </div>
-            </label>
-            <p className="mt-2 text-xs leading-5 text-slate-500">{t.localOnlyHint}</p>
-          </section>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{t.proxyHint}</p>
+            </Panel>
 
-          <form onSubmit={createAndPlan} className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <Wand2 size={18} className="text-emerald-400" />
-              <h2 className="font-medium">{t.projectIntake}</h2>
-            </div>
-            <label className="mb-3 block text-sm text-slate-300">
-              {t.title}
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
-              />
-            </label>
-            <label className="mb-3 block text-sm text-slate-300">
-              {t.scriptPrompt}
-              <textarea
-                value={scriptPrompt}
-                onChange={(event) => setScriptPrompt(event.target.value)}
-                rows={7}
-                className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
-              />
-            </label>
-            <label className="mb-3 block text-sm text-slate-300">
-              {t.visualStyle}
-              <input
-                value={styleHint}
-                onChange={(event) => setStyleHint(event.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
-              />
-            </label>
-            <label className="mb-4 block text-sm text-slate-300">
-              {t.audioStyle}
-              <input
-                value={audioHint}
-                onChange={(event) => setAudioHint(event.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
-              />
-            </label>
-            <button
-              disabled={busy}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 font-medium text-slate-950 disabled:opacity-60"
-            >
-              {busy ? <Loader2 size={17} className="animate-spin" /> : <Sparkles size={17} />}
-              {t.createCineGraph}
-            </button>
-          </form>
-
-          <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Film size={18} className="text-sky-300" />
-              <h2 className="font-medium">{t.sceneShotTree}</h2>
-            </div>
-            <div className="space-y-2">
-              {graph?.shots.map((shot) => (
-                <button
-                  key={shot.shot_id}
-                  onClick={() => setSelectedShotId(shot.shot_id)}
-                  className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
-                    selectedShot?.shot_id === shot.shot_id
-                      ? "border-emerald-400 bg-emerald-400/10"
-                      : "border-slate-800 bg-[#0b0d10] hover:border-slate-600"
-                  }`}
-                >
-                  <span className="font-mono text-xs text-slate-400">{shot.shot_id}</span>
-                  <span className="mt-1 block text-slate-100">{shot.purpose}</span>
-                </button>
-              )) ?? <p className="text-sm text-slate-500">{t.emptyShots}</p>}
-            </div>
-          </section>
-        </section>
-
-        <section id="storyboard" className="space-y-4 scroll-mt-24">
-          <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-mono text-xs text-slate-500">{project?.project_id ?? t.noProject}</p>
-                <h2 className="text-lg font-semibold">{selectedShot?.shot_id ?? t.storyboardTimeline}</h2>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <ActionButton onClick={generateKeyframes} disabled={!selectedShot || busy} icon={<KeyRound size={16} />} label={t.keyframes} />
-                <ActionButton onClick={renderShot} disabled={!selectedShot || busy} icon={<Play size={16} />} label={t.render} />
-                <ActionButton onClick={renderAudio} disabled={!selectedShot || busy} icon={<Music2 size={16} />} label={t.audio} />
-                <ActionButton onClick={exportProject} disabled={!project || busy} icon={<Save size={16} />} label={t.export} />
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {keyframeSlots.map((slot) => (
-                <div key={slot} className="aspect-video rounded-md border border-slate-700 bg-[#0b0d10] p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium capitalize">{t[slot]}</span>
-                    <CheckCircle2 size={15} className="text-slate-600" />
-                  </div>
-                  <p className="mt-8 text-sm text-slate-500">{t.keyframeSlot}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-4">
-              <p className="mb-2 text-sm font-medium text-slate-300">{t.chunkTimeline}</p>
-              <div className="flex min-h-20 items-stretch gap-2 overflow-x-auto">
-                {selectedChunks.map((chunk) => (
-                  <div key={chunk.chunk_id} className="min-w-36 rounded-md border border-slate-700 bg-slate-900 p-3">
-                    <p className="font-mono text-xs text-emerald-300">{chunk.chunk_id.split("_").pop()}</p>
-                    <p className="mt-2 text-sm">{chunk.start}s - {chunk.end}s</p>
-                    <p className="text-xs text-slate-500">{t.complexity} {chunk.complexity}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-4">
-              <p className="mb-2 text-sm font-medium text-slate-300">{t.videoPreview}</p>
-              {previewUrl ? (
-                <video key={previewUrl} controls className="aspect-video w-full rounded-md bg-slate-950" src={previewUrl}>
-                  {t.previewUnavailable}
-                </video>
-              ) : (
-                <div className="grid aspect-video place-items-center rounded-md bg-slate-950 p-6 text-center text-sm text-slate-500">
-                  <span>{t.noPreview}</span>
-                </div>
-              )}
-            </div>
+            <Inspector title={t.worldState} data={graph?.world_state} />
+            <Inspector title={t.projectJson} data={project} />
+            <Inspector title={t.shotJson} data={selectedShot} />
           </div>
-
-          <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Scissors size={18} className="text-amber-300" />
-              <h2 className="font-medium">{t.evaluatorRepair}</h2>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {[t.promptMatch, t.cameraMatch, t.artifactRisk].map((metric) => (
-                <div key={metric} className="rounded-md border border-slate-800 bg-[#0b0d10] px-3 py-2 text-sm text-slate-300">
-                  {metric}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="monitor" className="space-y-4 scroll-mt-24">
-          <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <RefreshCw size={18} className="text-violet-300" />
-              <h2 className="font-medium">{t.runState}</h2>
-            </div>
-            <p className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-slate-300">{status}</p>
-          </div>
-
-          <SystemUsagePanel usage={usage} error={usageError} t={t} />
-          <JobProgressPanel jobs={jobs} t={t} />
-
-          <Inspector title={t.worldState} data={graph?.world_state} emptyText={t.noData} />
-          <Inspector title={t.selectedShot} data={selectedShot} emptyText={t.noData} />
-
-          <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Music2 size={18} className="text-rose-300" />
-              <h2 className="font-medium">{t.audioEvents}</h2>
-            </div>
-            <div className="space-y-2">
-              {selectedEvents.map((event) => (
-                <div key={event.event_id} className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm">
-                  <p className="font-mono text-xs text-slate-500">{event.time}s / {event.audio.type}</p>
-                  <p className="mt-1 text-slate-200">{event.audio.description}</p>
-                  <p className="mt-1 text-xs text-slate-500">sync {event.audio.sync_importance}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </div>
+        ) : null}
+      </section>
     </main>
   );
 }
 
-function ActionButton({
-  onClick,
-  disabled,
-  icon,
-  label,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-  icon: ReactNode;
-  label: string;
-}) {
+function StepPill({ number, label, done, active }: { number: string; label: string; done: boolean; active: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-9 items-center gap-2 rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-sm text-slate-200 hover:border-emerald-400 disabled:opacity-50"
+    <div
+      className={`flex items-center gap-3 rounded-md border p-3 ${
+        done
+          ? "border-emerald-400 bg-emerald-400/10"
+          : active
+            ? "border-amber-300 bg-amber-300/10"
+            : "border-slate-800 bg-[#0b0d10]"
+      }`}
     >
-      {icon}
-      {label}
-    </button>
+      <div className="grid size-8 shrink-0 place-items-center rounded bg-slate-900 font-mono text-sm text-slate-300">
+        {done ? <CheckCircle2 size={17} className="text-emerald-300" /> : number}
+      </div>
+      <p className="text-sm font-medium text-slate-100">{label}</p>
+    </div>
   );
 }
 
-function PrimaryWorkflowAction({
-  t,
-  busy,
-  graphReady,
-  selectedShot,
-  keyframesDone,
-  renderDone,
-  audioDone,
-  exportDone,
-  onCreate,
-  onKeyframes,
-  onRender,
-  onAudio,
-  onExport,
-}: {
-  t: Record<string, string>;
-  busy: boolean;
-  graphReady: boolean;
-  selectedShot: boolean;
-  keyframesDone: boolean;
-  renderDone: boolean;
-  audioDone: boolean;
-  exportDone: boolean;
-  onCreate: (event: FormEvent) => void;
-  onKeyframes: () => void;
-  onRender: () => void;
-  onAudio: () => void;
-  onExport: () => void;
-}) {
-  if (!graphReady) {
-    return (
-      <button
-        disabled={busy}
-        onClick={(event) => onCreate(event)}
-        className="flex h-10 items-center gap-2 rounded-md bg-emerald-400 px-4 text-sm font-medium text-slate-950 disabled:opacity-60"
-      >
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-        {t.createCineGraph}
-      </button>
-    );
-  }
-  if (!selectedShot) {
-    return <span className="rounded-md border border-amber-300 px-3 py-2 text-sm text-amber-200">{t.actionSelectShot}</span>;
-  }
-  if (!keyframesDone) {
-    return <WorkflowButton busy={busy} icon={<KeyRound size={16} />} label={t.keyframes} onClick={onKeyframes} />;
-  }
-  if (!renderDone) {
-    return <WorkflowButton busy={busy} icon={<Play size={16} />} label={t.render} onClick={onRender} />;
-  }
-  if (!audioDone) {
-    return <WorkflowButton busy={busy} icon={<Music2 size={16} />} label={t.audio} onClick={onAudio} />;
-  }
-  if (!exportDone) {
-    return <WorkflowButton busy={busy} icon={<Save size={16} />} label={t.export} onClick={onExport} />;
-  }
-  return <span className="rounded-md border border-emerald-400 px-3 py-2 text-sm text-emerald-300">{t.actionDone}</span>;
-}
-
-function WorkflowButton({
-  busy,
+function Panel({
+  title,
+  description,
   icon,
-  label,
-  onClick,
+  children,
 }: {
-  busy: boolean;
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
+  title: string;
+  description?: string;
+  icon?: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <button
-      disabled={busy}
-      onClick={onClick}
-      className="flex h-10 items-center gap-2 rounded-md bg-emerald-400 px-4 text-sm font-medium text-slate-950 disabled:opacity-60"
-    >
-      {busy ? <Loader2 size={16} className="animate-spin" /> : icon}
-      {label}
-    </button>
+    <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
+      <div className="mb-4 flex items-start gap-2">
+        {icon ? <div className="mt-0.5">{icon}</div> : null}
+        <div>
+          <h2 className="font-semibold text-slate-100">{title}</h2>
+          {description ? <p className="mt-1 text-sm leading-5 text-slate-400">{description}</p> : null}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="grid min-h-28 place-items-center rounded-md border border-dashed border-slate-700 bg-[#0b0d10] p-4 text-center text-sm text-slate-500">
+      {text}
+    </div>
   );
 }
 
@@ -985,40 +851,52 @@ function SystemUsagePanel({
   t: Record<string, string>;
 }) {
   const gpu = usage?.gpu.gpus?.[0];
+  if (error) {
+    return <p className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-amber-300">{error}</p>;
+  }
   return (
-    <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-      <h2 className="mb-3 font-medium">{t.systemUsage}</h2>
-      {error ? (
-        <p className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-amber-300">{error}</p>
-      ) : (
-        <div className="grid gap-2 text-sm">
-          <UsageMeter label={t.cpu} value={usage?.cpu.usage_percent ?? 0} detail={usage ? `${usage.cpu.core_count} cores` : "-"} />
-          <UsageMeter label={t.memory} value={usage?.memory.usage_percent ?? 0} detail={usage ? `${usage.memory.used_mb} / ${usage.memory.total_mb} MB` : "-"} />
-          <UsageMeter label={t.disk} value={usage?.disk.usage_percent ?? 0} detail={usage ? `${usage.disk.used_gb} / ${usage.disk.total_gb} GB` : "-"} />
-          <UsageMeter
-            label={t.gpu}
-            value={gpu?.utilization_percent ?? 0}
-            detail={gpu ? `${gpu.name} | ${gpu.memory_used_mb} / ${gpu.memory_total_mb} MB | ${gpu.temperature_c}C` : t.unavailable}
-          />
-        </div>
-      )}
+    <div className="grid gap-2">
+      <UsageMeter label={t.cpu} value={usage?.cpu.usage_percent ?? 0} detail={usage ? `${usage.cpu.core_count} cores` : "-"} />
+      <UsageMeter
+        label={t.gpu}
+        value={gpu?.utilization_percent ?? 0}
+        detail={gpu ? `${gpu.name} | ${gpu.memory_used_mb}/${gpu.memory_total_mb} MB | ${gpu.temperature_c}C` : t.unavailable}
+      />
+      <UsageMeter
+        label={t.memory}
+        value={usage?.memory.usage_percent ?? 0}
+        detail={usage ? `${usage.memory.used_mb}/${usage.memory.total_mb} MB` : "-"}
+      />
+      <UsageMeter label={t.disk} value={usage?.disk.usage_percent ?? 0} detail={usage ? `${usage.disk.used_gb}/${usage.disk.total_gb} GB` : "-"} />
+    </div>
+  );
+}
+
+function UsageMeter({ label, value, detail }: { label: string; value: number; detail: string }) {
+  const normalized = Math.max(0, Math.min(100, value));
+  return (
+    <div className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-slate-200">{label}</span>
+        <span className="font-mono text-xs text-slate-400">{normalized.toFixed(1)}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded bg-slate-800">
+        <div className="h-full rounded bg-emerald-400" style={{ width: `${normalized}%` }} />
+      </div>
+      <p className="mt-2 truncate text-xs text-slate-500">{detail}</p>
     </div>
   );
 }
 
 function JobProgressPanel({ jobs, t }: { jobs: Job[]; t: Record<string, string> }) {
+  if (jobs.length === 0) {
+    return <EmptyState text={t.noJobs} />;
+  }
   return (
-    <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-      <h2 className="mb-3 font-medium">{t.renderQueue}</h2>
-      {jobs.length === 0 ? (
-        <p className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-slate-500">{t.noJobs}</p>
-      ) : (
-        <div className="space-y-2">
-          {jobs.map((job) => (
-            <JobProgressItem key={job.job_id} job={job} t={t} />
-          ))}
-        </div>
-      )}
+    <div className="space-y-2">
+      {jobs.map((job) => (
+        <JobProgressItem key={job.job_id} job={job} t={t} />
+      ))}
     </div>
   );
 }
@@ -1038,11 +916,16 @@ function JobProgressItem({ job, t }: { job: Job; t: Record<string, string> }) {
         <div className="h-full rounded bg-emerald-400 transition-[width]" style={{ width: `${percent}%` }} />
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500">
-        <span>{t.elapsed}: {formatSeconds(job.elapsed_sec)}</span>
-        <span>{t.estimated}: {formatSeconds(job.estimated_duration_sec)}</span>
-        <span>{t.remaining}: {formatSeconds(job.remaining_sec)}</span>
+        <span>
+          {t.elapsed}: {formatSeconds(job.elapsed_sec)}
+        </span>
+        <span>
+          {t.estimated}: {formatSeconds(job.estimated_duration_sec)}
+        </span>
+        <span>
+          {t.remaining}: {formatSeconds(job.remaining_sec)}
+        </span>
       </div>
-      <p className="mt-1 font-mono text-xs text-slate-600">{job.status}</p>
     </div>
   );
 }
@@ -1057,29 +940,12 @@ function formatSeconds(value: number | null) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-function UsageMeter({ label, value, detail }: { label: string; value: number; detail: string }) {
-  const normalized = Math.max(0, Math.min(100, value));
+function Inspector({ title, data }: { title: string; data: unknown }) {
   return (
-    <div className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="font-medium text-slate-200">{label}</span>
-        <span className="font-mono text-xs text-slate-400">{normalized.toFixed(1)}%</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded bg-slate-800">
-        <div className="h-full rounded bg-emerald-400" style={{ width: `${normalized}%` }} />
-      </div>
-      <p className="mt-2 truncate text-xs text-slate-500">{detail}</p>
-    </div>
-  );
-}
-
-function Inspector({ title, data, emptyText }: { title: string; data: unknown; emptyText: string }) {
-  return (
-    <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
-      <h2 className="mb-3 font-medium">{title}</h2>
+    <Panel title={title}>
       <pre className="max-h-72 overflow-auto rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-xs leading-5 text-slate-300">
-        {data ? JSON.stringify(data, null, 2) : emptyText}
+        {data ? JSON.stringify(data, null, 2) : "-"}
       </pre>
-    </div>
+    </Panel>
   );
 }
