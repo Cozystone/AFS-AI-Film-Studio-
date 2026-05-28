@@ -287,7 +287,7 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
 
     video_path = out_dir / "video.mp4"
     if _ffmpeg_available():
-        subprocess.run(
+        result = subprocess.run(
             [
                 "ffmpeg",
                 "-y",
@@ -295,8 +295,6 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
                 "lavfi",
                 "-i",
                 f"color=c=0x111827:s=832x480:d={chunk.duration}",
-                "-vf",
-                f"drawtext=text='{chunk_id} mock preview':fontcolor=white:fontsize=28:x=40:y=40",
                 "-pix_fmt",
                 "yuv420p",
                 str(video_path),
@@ -305,6 +303,9 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        if result.returncode != 0 or not video_path.exists():
+            video_path = out_dir / "video.ffmpeg_failed.txt"
+            video_path.write_text("ffmpeg failed; mock video metadata only\n", encoding="utf-8")
     else:
         video_path = out_dir / "video.ffmpeg_missing.txt"
         video_path.write_text("ffmpeg not found; mock video metadata only\n", encoding="utf-8")

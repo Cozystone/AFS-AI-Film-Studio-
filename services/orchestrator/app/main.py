@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from .pipeline import complete_job, create_job, mock_plan, render_mock_audio, render_mock_chunk, update_job_progress, write_placeholder_keyframes
 from .schemas import (
@@ -108,6 +109,52 @@ def _find_project_for_chunk(chunk_id: str) -> tuple[str, CineGraph]:
     raise HTTPException(status_code=404, detail="chunk not found")
 
 
+def _find_artifact(artifact_id: str) -> dict:
+    for project in store.list_projects():
+        project_dir = store.project_dir(project.project_id)
+        for artifact_path in project_dir.rglob("*.json"):
+            if not artifact_path.name.startswith(("artifact.", "foley", "ambience", "music", "dialogue")):
+                continue
+            try:
+                payload = store.read_json(artifact_path)
+            except Exception:
+                continue
+            if payload.get("artifact_id") == artifact_id:
+                payload["_metadata_path"] = str(artifact_path)
+                return payload
+    raise HTTPException(status_code=404, detail="artifact not found")
+
+
+@app.get("/api/artifacts/{artifact_id}/media")
+def get_artifact_media(artifact_id: str) -> FileResponse:
+    artifact = _find_artifact(artifact_id)
+    path = artifact.get("path")
+    if not path:
+        raise HTTPException(status_code=404, detail="artifact has no media path")
+    media_path = store.root.parent / path
+    if not media_path.exists() or media_path.suffix not in {".mp4", ".wav"}:
+        raise HTTPException(status_code=404, detail="media file not available")
+    media_type = "video/mp4" if media_path.suffix == ".mp4" else "audio/wav"
+    return FileResponse(media_path, media_type=media_type, filename=media_path.name)
+
+
+@app.get("/api/shots/{shot_id}/preview")
+def get_shot_preview(shot_id: str) -> dict:
+    project_id, _ = _find_project_for_shot(shot_id)
+    shot_dir = store.project_dir(project_id) / "shots" / shot_id / "chunks"
+    artifacts = sorted(shot_dir.rglob("artifact.video.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for artifact_path in artifacts:
+        artifact = store.read_json(artifact_path)
+        media_path = store.root.parent / artifact.get("path", "")
+        if media_path.exists() and media_path.suffix == ".mp4":
+            return {
+                "shot_id": shot_id,
+                "artifact": artifact,
+                "media_url": f"/api/artifacts/{artifact['artifact_id']}/media",
+            }
+    raise HTTPException(status_code=404, detail="preview media not available")
+
+
 @app.post("/api/shots/{shot_id}/keyframes/generate")
 def generate_keyframes(shot_id: str, payload: KeyframeGenerateRequest) -> dict:
     project_id, _ = _find_project_for_shot(shot_id)
@@ -144,7 +191,14 @@ def render_shot(shot_id: str, payload: RenderRequest) -> dict:
         update_job_progress(store, job, min(index / total, 0.95))
     outputs = [artifact.path for artifact in artifacts]
     complete_job(store, job, outputs)
-    return {"shot_id": shot_id, "artifacts": artifacts, "evaluations": evaluations}
+    preview = next((artifact for artifact in artifacts if artifact.path.endswith(".mp4")), None)
+    return {
+        "shot_id": shot_id,
+        "artifacts": artifacts,
+        "evaluations": evaluations,
+        "preview_artifact_id": preview.artifact_id if preview else None,
+        "preview_url": f"/api/artifacts/{preview.artifact_id}/media" if preview else None,
+    }
 
 
 @app.post("/api/chunks/{chunk_id}/repair")

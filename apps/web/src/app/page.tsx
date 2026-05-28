@@ -102,6 +102,17 @@ type Job = {
   remaining_sec: number | null;
 };
 
+type RenderShotResponse = {
+  shot_id: string;
+  preview_artifact_id: string | null;
+  preview_url: string | null;
+};
+
+type ShotPreviewResponse = {
+  shot_id: string;
+  media_url: string;
+};
+
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
 
 const samplePrompt =
@@ -150,6 +161,8 @@ const translations = {
     complexity: "complexity",
     videoPreview: "Video Preview",
     previewText: "MockRenderer writes placeholder chunks to local storage.",
+    noPreview: "Render a shot to generate a preview.",
+    previewUnavailable: "Preview media is not available yet.",
     evaluatorRepair: "Evaluator / Repair",
     promptMatch: "Prompt Match 82",
     cameraMatch: "Camera Match 72",
@@ -210,6 +223,8 @@ const translations = {
     complexity: "복잡도",
     videoPreview: "비디오 프리뷰",
     previewText: "MockRenderer가 로컬 저장소에 placeholder 청크를 기록합니다.",
+    noPreview: "샷을 렌더하면 프리뷰가 표시됩니다.",
+    previewUnavailable: "아직 프리뷰 미디어가 없습니다.",
     evaluatorRepair: "평가기 / 리페어",
     promptMatch: "프롬프트 일치 82",
     cameraMatch: "카메라 일치 72",
@@ -264,6 +279,7 @@ export default function Home() {
   const [usage, setUsage] = useState<SystemUsage | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const t = translations[language];
 
   const selectedShot = graph?.shots.find((shot) => shot.shot_id === selectedShotId) ?? graph?.shots[0];
@@ -360,6 +376,32 @@ export default function Home() {
     };
   }, [orchestratorUrl, request]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadPreview() {
+      if (!selectedShot || !orchestratorUrl) {
+        setPreviewUrl(null);
+        return;
+      }
+      try {
+        const preview = await request<ShotPreviewResponse>(`/api/shots/${selectedShot.shot_id}/preview`);
+        if (active) {
+          setPreviewUrl(`${orchestratorUrl}${preview.media_url}?t=${Date.now()}`);
+        }
+      } catch {
+        if (active) {
+          setPreviewUrl(null);
+        }
+      }
+    }
+
+    loadPreview();
+    return () => {
+      active = false;
+    };
+  }, [orchestratorUrl, request, selectedShot]);
+
   async function createAndPlan(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -412,10 +454,13 @@ export default function Home() {
     setBusy(true);
     try {
       setStatus(`Rendering ${selectedShot.shot_id} with MockRenderer`);
-      await request(`/api/shots/${selectedShot.shot_id}/render`, {
+      const rendered = await request<RenderShotResponse>(`/api/shots/${selectedShot.shot_id}/render`, {
         method: "POST",
         body: JSON.stringify({ preset: "preview", renderer: "mock", audio: true }),
       });
+      if (rendered.preview_url) {
+        setPreviewUrl(`${orchestratorUrl}${rendered.preview_url}?t=${Date.now()}`);
+      }
       setStatus(t.renderStatus);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Render failed");
@@ -633,9 +678,15 @@ export default function Home() {
 
             <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-4">
               <p className="mb-2 text-sm font-medium text-slate-300">{t.videoPreview}</p>
-              <div className="grid aspect-video place-items-center rounded-md bg-slate-950 text-center text-sm text-slate-500">
-                {t.previewText}
-              </div>
+              {previewUrl ? (
+                <video key={previewUrl} controls className="aspect-video w-full rounded-md bg-slate-950" src={previewUrl}>
+                  {t.previewUnavailable}
+                </video>
+              ) : (
+                <div className="grid aspect-video place-items-center rounded-md bg-slate-950 p-6 text-center text-sm text-slate-500">
+                  <span>{t.noPreview}</span>
+                </div>
+              )}
             </div>
           </div>
 

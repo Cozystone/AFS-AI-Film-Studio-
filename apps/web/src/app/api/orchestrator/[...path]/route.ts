@@ -35,7 +35,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
   responseHeaders.delete("transfer-encoding");
   responseHeaders.set("Access-Control-Allow-Origin", "*");
 
-  const body = await response.text();
+  const body = await response.arrayBuffer();
 
   return new NextResponse(body, {
     status: response.status,
