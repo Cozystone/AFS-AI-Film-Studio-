@@ -212,6 +212,9 @@ class Job(BaseModel):
     ended_at: str | None = None
     error: str | None = None
     outputs: list[str] = []
+    estimated_duration_sec: float | None = None
+    elapsed_sec: float = 0.0
+    remaining_sec: float | None = None
 
 
 class KeyframeGenerateRequest(BaseModel):

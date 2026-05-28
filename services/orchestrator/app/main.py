@@ -4,7 +4,7 @@ import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .pipeline import complete_job, create_job, mock_plan, render_mock_audio, render_mock_chunk, write_placeholder_keyframes
+from .pipeline import complete_job, create_job, mock_plan, render_mock_audio, render_mock_chunk, update_job_progress, write_placeholder_keyframes
 from .schemas import (
     AudioRenderRequest,
     CineGraph,
@@ -77,7 +77,9 @@ def get_project(project_id: str) -> Project:
 def generate_plan(project_id: str) -> CineGraph:
     project = store.get_project(project_id)
     job = create_job(store, JobType.PLAN_PROJECT, project_id, project_id)
+    update_job_progress(store, job, 0.15)
     graph = mock_plan(project)
+    update_job_progress(store, job, 0.75)
     project_dir = store.project_dir(project_id)
     store.write_json(project_dir / "world_state.json", graph.world_state)
     store.write_json(project_dir / "cinegraph.json", graph)
@@ -110,6 +112,7 @@ def _find_project_for_chunk(chunk_id: str) -> tuple[str, CineGraph]:
 def generate_keyframes(shot_id: str, payload: KeyframeGenerateRequest) -> dict:
     project_id, _ = _find_project_for_shot(shot_id)
     job = create_job(store, JobType.GENERATE_KEYFRAME, shot_id, project_id)
+    update_job_progress(store, job, 0.2)
     outputs = write_placeholder_keyframes(store, project_id, shot_id, payload.slots)
     complete_job(store, job, outputs)
     return {"shot_id": shot_id, "outputs": outputs}
@@ -119,6 +122,7 @@ def generate_keyframes(shot_id: str, payload: KeyframeGenerateRequest) -> dict:
 def render_chunk(chunk_id: str, payload: RenderRequest) -> dict:
     project_id, _ = _find_project_for_chunk(chunk_id)
     job = create_job(store, JobType.RENDER_CHUNK, chunk_id, project_id)
+    update_job_progress(store, job, 0.1)
     artifact, evaluation = render_mock_chunk(store, project_id, chunk_id, payload.renderer)
     complete_job(store, job, [artifact.path])
     return {"artifact": artifact, "evaluation": evaluation}
@@ -130,10 +134,14 @@ def render_shot(shot_id: str, payload: RenderRequest) -> dict:
     job = create_job(store, JobType.STITCH_SHOT, shot_id, project_id)
     artifacts = []
     evaluations = []
-    for chunk in [chunk for chunk in graph.chunks if chunk.shot_id == shot_id]:
+    shot_chunks = [chunk for chunk in graph.chunks if chunk.shot_id == shot_id]
+    total = max(len(shot_chunks), 1)
+    update_job_progress(store, job, 0.05)
+    for index, chunk in enumerate(shot_chunks, start=1):
         artifact, evaluation = render_mock_chunk(store, project_id, chunk.chunk_id, payload.renderer)
         artifacts.append(artifact)
         evaluations.append(evaluation)
+        update_job_progress(store, job, min(index / total, 0.95))
     outputs = [artifact.path for artifact in artifacts]
     complete_job(store, job, outputs)
     return {"shot_id": shot_id, "artifacts": artifacts, "evaluations": evaluations}
@@ -143,6 +151,7 @@ def render_shot(shot_id: str, payload: RenderRequest) -> dict:
 def repair_chunk(chunk_id: str, payload: RepairRequest) -> dict:
     project_id, _ = _find_project_for_chunk(chunk_id)
     job = create_job(store, JobType.REPAIR_CHUNK, chunk_id, project_id)
+    update_job_progress(store, job, 0.1)
     artifact, evaluation = render_mock_chunk(store, project_id, chunk_id, "MockRendererRepair")
     complete_job(store, job, [artifact.path])
     return {"chunk_id": chunk_id, "repair_reasons": payload.repair_reasons, "artifact": artifact, "evaluation": evaluation}
@@ -152,6 +161,7 @@ def repair_chunk(chunk_id: str, payload: RepairRequest) -> dict:
 def render_audio(shot_id: str, payload: AudioRenderRequest) -> dict:
     project_id, _ = _find_project_for_shot(shot_id)
     job = create_job(store, JobType.RENDER_AUDIO_LAYER, shot_id, project_id)
+    update_job_progress(store, job, 0.2)
     outputs = render_mock_audio(store, project_id, shot_id, payload.layers)
     complete_job(store, job, outputs)
     return {"shot_id": shot_id, "outputs": outputs}
@@ -161,6 +171,7 @@ def render_audio(shot_id: str, payload: AudioRenderRequest) -> dict:
 def export_project(project_id: str, payload: ExportRequest) -> dict:
     project = store.get_project(project_id)
     job = create_job(store, JobType.EXPORT_PROJECT, project_id, project_id)
+    update_job_progress(store, job, 0.25)
     export_dir = store.project_dir(project_id) / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     path = export_dir / f"final_{payload.resolution.replace('x', 'p')}.{payload.format}"

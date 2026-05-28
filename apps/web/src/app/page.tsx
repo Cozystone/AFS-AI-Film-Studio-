@@ -87,6 +87,21 @@ type SystemUsage = {
   };
 };
 
+type Job = {
+  job_id: string;
+  project_id: string | null;
+  type: string;
+  target_id: string;
+  status: string;
+  progress: number;
+  created_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+  estimated_duration_sec: number | null;
+  elapsed_sec: number;
+  remaining_sec: number | null;
+};
+
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
 
 const samplePrompt =
@@ -146,6 +161,12 @@ const translations = {
     noData: "No data yet",
     language: "Language",
     systemUsage: "System Usage",
+    renderQueue: "Render Queue",
+    progress: "Progress",
+    elapsed: "Elapsed",
+    estimated: "Estimated",
+    remaining: "Remaining",
+    noJobs: "No jobs yet.",
     cpu: "CPU",
     gpu: "GPU",
     memory: "Memory",
@@ -200,6 +221,12 @@ const translations = {
     noData: "아직 데이터 없음",
     language: "언어",
     systemUsage: "시스템 사용량",
+    renderQueue: "렌더 큐",
+    progress: "진행률",
+    elapsed: "현재 소요",
+    estimated: "예상 소요",
+    remaining: "남은 시간",
+    noJobs: "아직 작업이 없습니다.",
     cpu: "CPU",
     gpu: "GPU",
     memory: "메모리",
@@ -236,6 +263,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [usage, setUsage] = useState<SystemUsage | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const t = translations[language];
 
   const selectedShot = graph?.shots.find((shot) => shot.shot_id === selectedShotId) ?? graph?.shots[0];
@@ -303,6 +331,34 @@ export default function Home() {
       window.clearInterval(interval);
     };
   }, [orchestratorUrl, request, t.localOnlyHint, t.offline]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadJobs() {
+      if (!orchestratorUrl) {
+        setJobs([]);
+        return;
+      }
+      try {
+        const nextJobs = await request<Job[]>("/api/jobs");
+        if (active) {
+          setJobs(nextJobs.slice(0, 8));
+        }
+      } catch {
+        if (active) {
+          setJobs([]);
+        }
+      }
+    }
+
+    loadJobs();
+    const interval = window.setInterval(loadJobs, 1500);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [orchestratorUrl, request]);
 
   async function createAndPlan(event: FormEvent) {
     event.preventDefault();
@@ -608,6 +664,7 @@ export default function Home() {
           </div>
 
           <SystemUsagePanel usage={usage} error={usageError} t={t} />
+          <JobProgressPanel jobs={jobs} t={t} />
 
           <Inspector title={t.worldState} data={graph?.world_state} emptyText={t.noData} />
           <Inspector title={t.selectedShot} data={selectedShot} emptyText={t.noData} />
@@ -685,6 +742,57 @@ function SystemUsagePanel({
       )}
     </div>
   );
+}
+
+function JobProgressPanel({ jobs, t }: { jobs: Job[]; t: Record<string, string> }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
+      <h2 className="mb-3 font-medium">{t.renderQueue}</h2>
+      {jobs.length === 0 ? (
+        <p className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-slate-500">{t.noJobs}</p>
+      ) : (
+        <div className="space-y-2">
+          {jobs.map((job) => (
+            <JobProgressItem key={job.job_id} job={job} t={t} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JobProgressItem({ job, t }: { job: Job; t: Record<string, string> }) {
+  const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
+  return (
+    <div className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-slate-200">{job.type}</p>
+          <p className="truncate font-mono text-xs text-slate-500">{job.target_id}</p>
+        </div>
+        <span className="rounded border border-slate-700 px-2 py-1 font-mono text-xs text-slate-300">{percent}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded bg-slate-800">
+        <div className="h-full rounded bg-emerald-400 transition-[width]" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500">
+        <span>{t.elapsed}: {formatSeconds(job.elapsed_sec)}</span>
+        <span>{t.estimated}: {formatSeconds(job.estimated_duration_sec)}</span>
+        <span>{t.remaining}: {formatSeconds(job.remaining_sec)}</span>
+      </div>
+      <p className="mt-1 font-mono text-xs text-slate-600">{job.status}</p>
+    </div>
+  );
+}
+
+function formatSeconds(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return "-";
+  }
+  const total = Math.max(0, Math.round(value));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function UsageMeter({ label, value, detail }: { label: string; value: number; detail: string }) {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from .formulas import compute_complexity, compute_render_budget, decide_repair, evaluator_final_score
@@ -34,7 +35,43 @@ def new_id(prefix: str) -> str:
 
 
 def create_job(store: LocalStore, job_type: JobType, target_id: str, project_id: str | None = None) -> Job:
-    job = Job(job_id=new_id("job"), project_id=project_id, type=job_type, target_id=target_id)
+    estimates = {
+        JobType.PLAN_PROJECT: 8.0,
+        JobType.GENERATE_KEYFRAME: 6.0,
+        JobType.RENDER_CHUNK: 15.0,
+        JobType.STITCH_SHOT: 20.0,
+        JobType.RENDER_AUDIO_LAYER: 10.0,
+        JobType.MIX_AUDIO: 8.0,
+        JobType.EVALUATE_CHUNK: 6.0,
+        JobType.REPAIR_CHUNK: 18.0,
+        JobType.EXPORT_PROJECT: 12.0,
+    }
+    job = Job(
+        job_id=new_id("job"),
+        project_id=project_id,
+        type=job_type,
+        target_id=target_id,
+        estimated_duration_sec=estimates.get(job_type),
+    )
+    store.save_job(job)
+    return job
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
+def update_job_progress(store: LocalStore, job: Job, progress: float, status: JobStatus = JobStatus.running) -> Job:
+    job.status = status
+    job.progress = max(0.0, min(progress, 1.0))
+    job.started_at = job.started_at or now_iso()
+    started = _parse_iso(job.started_at)
+    if started:
+        job.elapsed_sec = round((datetime.fromisoformat(now_iso()) - started).total_seconds(), 2)
+    if job.estimated_duration_sec is not None:
+        job.remaining_sec = round(max(job.estimated_duration_sec - job.elapsed_sec, 0.0), 2)
     store.save_job(job)
     return job
 
@@ -44,6 +81,11 @@ def complete_job(store: LocalStore, job: Job, outputs: list[str]) -> Job:
     job.progress = 1.0
     job.started_at = job.started_at or now_iso()
     job.ended_at = now_iso()
+    started = _parse_iso(job.started_at)
+    ended = _parse_iso(job.ended_at)
+    if started and ended:
+        job.elapsed_sec = round((ended - started).total_seconds(), 2)
+    job.remaining_sec = 0.0
     job.outputs = outputs
     store.save_job(job)
     return job
