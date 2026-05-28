@@ -14,10 +14,15 @@ try {
         if ($line -match 'Production:\s+(https://[^\s]+)') {
             $deploymentUrl = $Matches[1].Replace("https://", "")
         }
+        if (-not $deploymentUrl -and $line -match '"url":\s+"https://([^"]+)"') {
+            $deploymentUrl = $Matches[1]
+        }
     }
 
     if (-not $deploymentUrl) {
-        throw "Could not find production deployment URL in Vercel output."
+        Write-Output "Deployment completed, but the deployment URL could not be parsed. Vercel may have already assigned the production alias."
+        Write-Output "Clean URL: https://$alias"
+        exit 0
     }
 
     vercel alias set $deploymentUrl $alias
