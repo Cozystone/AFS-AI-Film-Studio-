@@ -591,7 +591,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div id="make" className="mx-auto grid max-w-7xl gap-4 px-4 py-5 lg:grid-cols-[1.05fr_0.95fr]">
+      <div id="make" className="mx-auto grid max-w-[1500px] gap-4 px-4 py-5 lg:grid-cols-[0.78fr_1.22fr]">
         <section className="space-y-4">
           <Panel title={t.step1Title} description={t.step1Body} icon={<Wand2 size={18} className="text-emerald-300" />}>
             <div className="grid gap-3">
@@ -696,11 +696,11 @@ export default function Home() {
               {currentAction === t.done ? t.done : `${t.nextButton}: ${currentAction}`}
             </button>
 
-            <div className="overflow-hidden rounded-md border border-slate-800 bg-black">
+            <div className="overflow-hidden rounded-md border border-slate-800 bg-black shadow-2xl shadow-black/30">
               {previewUrl ? (
-                <video key={previewUrl} controls className="aspect-video w-full bg-black" src={previewUrl} />
+                <video key={previewUrl} controls className="aspect-video min-h-[360px] w-full bg-black object-contain" src={previewUrl} />
               ) : (
-                <div className="grid aspect-video place-items-center p-6 text-center text-sm text-slate-500">
+                <div className="grid aspect-video min-h-[360px] place-items-center p-6 text-center text-sm text-slate-500">
                   <div>
                     <MonitorPlay className="mx-auto mb-3 text-slate-700" size={36} />
                     {t.noPreview}
