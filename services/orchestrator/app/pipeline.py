@@ -424,6 +424,76 @@ def stitch_mock_shot(store: LocalStore, project_id: str, shot_id: str, chunk_art
     return artifact
 
 
+def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "MockRenderer") -> ArtifactMetadata:
+    project_dir = store.project_dir(project_id)
+    project = store.get_project(project_id)
+    graph = CineGraph.model_validate(store.read_json(project_dir / "cinegraph.json"))
+    export_dir = project_dir / "exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    video_path = export_dir / "final_1280p720.mp4"
+    shot_paths = [project_dir / "shots" / shot.shot_id / "final" / "shot.mp4" for shot in graph.shots]
+    available_shots = [path for path in shot_paths if path.exists()]
+
+    if _ffmpeg_available() and available_shots:
+        concat_list = export_dir / "shots.txt"
+        concat_list.write_text(
+            "".join(f"file '{path.resolve().as_posix()}'\n" for path in available_shots),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(concat_list),
+                "-c",
+                "copy",
+                str(video_path),
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode != 0 or not video_path.exists():
+            fallback = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    f"color=c=0x111827:s=832x480:d={project.format.duration}",
+                    "-pix_fmt",
+                    "yuv420p",
+                    str(video_path),
+                ],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if fallback.returncode != 0 or not video_path.exists():
+                video_path = export_dir / "final.ffmpeg_failed.txt"
+                video_path.write_text("ffmpeg failed; project movie metadata only\n", encoding="utf-8")
+    else:
+        video_path = export_dir / "final.ffmpeg_missing.txt"
+        video_path.write_text("ffmpeg not found or no shot media; project movie metadata only\n", encoding="utf-8")
+
+    artifact = ArtifactMetadata(
+        artifact_id=f"art_{project_id}_final_movie",
+        type="video_project",
+        path=str(video_path),
+        renderer=renderer,
+        input_context={"shot_count": len(graph.shots), "shot_paths": [str(path) for path in shot_paths]},
+        outputs={"video": str(video_path)},
+    )
+    store.write_json(export_dir / "artifact.final.json", artifact)
+    return artifact
+
+
 def render_mock_audio(store: LocalStore, project_id: str, shot_id: str, layers: list[str]) -> list[str]:
     project_dir = store.project_dir(project_id)
     audio_dir = project_dir / "shots" / shot_id / "audio"

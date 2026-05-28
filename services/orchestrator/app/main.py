@@ -11,6 +11,7 @@ from .pipeline import (
     mock_plan,
     render_mock_audio,
     render_mock_chunk,
+    stitch_project_movie,
     stitch_mock_shot,
     update_job_progress,
     write_placeholder_keyframes,
@@ -165,6 +166,22 @@ def get_shot_preview(shot_id: str) -> dict:
     raise HTTPException(status_code=404, detail="preview media not available")
 
 
+@app.get("/api/projects/{project_id}/preview")
+def get_project_preview(project_id: str) -> dict:
+    project_dir = store.project_dir(project_id)
+    artifacts = sorted((project_dir / "exports").glob("artifact.final.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for artifact_path in artifacts:
+        artifact = store.read_json(artifact_path)
+        media_path = store.root.parent / artifact.get("path", "")
+        if media_path.exists() and media_path.suffix == ".mp4":
+            return {
+                "project_id": project_id,
+                "artifact": artifact,
+                "media_url": f"/api/artifacts/{artifact['artifact_id']}/media",
+            }
+    raise HTTPException(status_code=404, detail="project preview media not available")
+
+
 @app.post("/api/shots/{shot_id}/keyframes/generate")
 def generate_keyframes(shot_id: str, payload: KeyframeGenerateRequest) -> dict:
     project_id, _ = _find_project_for_shot(shot_id)
@@ -240,6 +257,8 @@ def export_project(project_id: str, payload: ExportRequest) -> dict:
     update_job_progress(store, job, 0.25)
     export_dir = store.project_dir(project_id) / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
+    artifact = stitch_project_movie(store, project_id)
+    update_job_progress(store, job, 0.85)
     path = export_dir / f"final_{payload.resolution.replace('x', 'p')}.{payload.format}"
     sidecar = {
         "project_id": project.project_id,
@@ -247,11 +266,18 @@ def export_project(project_id: str, payload: ExportRequest) -> dict:
         "format": payload.format,
         "resolution": payload.resolution,
         "include_audio": payload.include_audio,
-        "status": "mock_export_metadata_only",
+        "status": "mock_export_ready",
+        "artifact_id": artifact.artifact_id,
+        "media_url": f"/api/artifacts/{artifact.artifact_id}/media" if artifact.path.endswith(".mp4") else None,
     }
     store.write_json(path.with_suffix(".json"), sidecar)
-    complete_job(store, job, [str(path.with_suffix(".json"))])
-    return {"export_path": str(path), "metadata_path": str(path.with_suffix(".json"))}
+    complete_job(store, job, [artifact.path, str(path.with_suffix(".json"))])
+    return {
+        "export_path": artifact.path,
+        "metadata_path": str(path.with_suffix(".json")),
+        "artifact": artifact,
+        "media_url": sidecar["media_url"],
+    }
 
 
 @app.get("/api/jobs")

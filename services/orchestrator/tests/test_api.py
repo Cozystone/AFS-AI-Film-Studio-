@@ -53,6 +53,10 @@ def test_project_plan_render_repair_flow() -> None:
 
     exported = client.post(f"/api/projects/{project_id}/export", json={"format": "mp4", "resolution": "1280x720", "include_audio": True})
     assert exported.status_code == 200
+    assert exported.json()["artifact"]["type"] == "video_project"
+    project_preview = client.get(f"/api/projects/{project_id}/preview")
+    assert project_preview.status_code == 200
+    assert project_preview.json()["artifact"]["type"] == "video_project"
 
 
 def test_system_usage_endpoint() -> None:
