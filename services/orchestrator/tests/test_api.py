@@ -45,3 +45,12 @@ def test_project_plan_render_repair_flow() -> None:
 
     exported = client.post(f"/api/projects/{project_id}/export", json={"format": "mp4", "resolution": "1280x720", "include_audio": True})
     assert exported.status_code == 200
+
+
+def test_system_usage_endpoint() -> None:
+    response = client.get("/api/system/usage")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "cpu" in payload
+    assert "gpu" in payload
+    assert "usage_percent" in payload["cpu"]

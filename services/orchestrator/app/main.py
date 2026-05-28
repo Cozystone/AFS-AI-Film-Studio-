@@ -20,6 +20,7 @@ from .schemas import (
     RepairRequest,
 )
 from .storage import LocalStore
+from .system_usage import system_usage
 
 app = FastAPI(title="AFS Orchestrator", version="0.1.0")
 app.add_middleware(
@@ -35,6 +36,11 @@ store = LocalStore()
 @app.get("/health")
 def health() -> dict:
     return {"ok": True, "service": "afs-orchestrator"}
+
+
+@app.get("/api/system/usage")
+def get_system_usage() -> dict:
+    return system_usage()
 
 
 @app.post("/api/projects")
