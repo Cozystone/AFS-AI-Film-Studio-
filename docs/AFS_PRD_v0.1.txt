@@ -1,0 +1,80 @@
+AFS PRD v0.1
+=============
+
+This file preserves the working product brief for AFS - AI Film Studio.
+
+Core identity:
+AFS is a local-first cinematic audio-video generation system. It is not a
+ComfyUI wrapper and it is not a cloud video generation app. It converts a user
+script into explicit film production structure: world state, scenes, shots,
+chunks, keyframes, audio-visual events, temporal context packs, rendered chunks,
+evaluation scores, repair jobs, and final exports.
+
+Core philosophy:
+Do not generate frames directly as one giant video. Generate events, scene
+state, keyframes, sound events, and temporal context first, then render only the
+needed local chunks.
+
+Pipeline:
+Script -> World State -> Shot List -> Audio-Visual Event Graph -> Keyframes ->
+Temporal Context Pack -> Chunked Video + Audio Render -> Evaluation ->
+Selective Repair -> Final Film
+
+MVP scope:
+1. Create a project from a script prompt.
+2. Save the script prompt locally.
+3. Generate mock CineDirector scene/shot/chunk structure.
+4. Generate World State.
+5. Generate Audio-Visual Event Graph.
+6. Show keyframe slots.
+7. Generate placeholder video chunks with MockRenderer.
+8. Stitch chunks with ffmpeg when available.
+9. Generate placeholder audio layers with MockAudioRenderer.
+10. Mix audio/video with ffmpeg when available.
+11. Store evaluator score schema.
+12. Create selective repair jobs for failed chunks.
+13. Store sidecar JSON for every artifact.
+
+Non-goals for v1:
+No paid cloud AI APIs, no training a large foundation model from scratch, no
+native one-step video model, no default 1080p/4K native generation, no hard
+dependency on ComfyUI, and no custom CUDA kernels in the product path.
+
+Required local-first constraints:
+All project data, intermediate artifacts, generated outputs, and metadata are
+stored locally by default. All AI/LLM execution must be local by default. Any
+external deployment must expose the local system intentionally, not replace it
+with paid cloud model calls.
+
+Canonical formulas:
+Latent token count:
+N = ceil(W / sx) * ceil(H / sy) * ceil(F / st)
+
+Attention cost:
+Attention Cost ~= O(N^2)
+
+Complexity:
+0.30 * motion_score
++ 0.25 * identity_importance
++ 0.20 * detail_importance
++ 0.15 * camera_motion
++ 0.10 * audio_sync_importance
+
+Render budget:
+steps = clamp(round(4 + 8 * Complexity), 4, 12)
+chunk_seconds = 1.25 if Complexity > 0.75, 2.0 if Complexity >= 0.45, else 3.0
+cache_strength = 1.0 - Complexity
+
+Evaluator final score:
+0.18 * prompt_match
++ 0.16 * character_consistency
++ 0.12 * prop_consistency
++ 0.10 * location_consistency
++ 0.12 * camera_match
++ 0.12 * motion_quality
++ 0.10 * temporal_stability
++ 0.06 * audio_sync
+- 0.14 * artifact_risk
+
+The full PRD lives in the originating project conversation. This checked-in
+file is the repo-local vision anchor used during implementation.

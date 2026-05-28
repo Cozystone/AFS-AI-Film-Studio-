@@ -1,0 +1,14 @@
+{
+  "name": "afs-ai-film-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AFS - local-first AI Film Studio monorepo",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint"
+  }
+}
