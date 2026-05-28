@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from .comfy_adapter import ComfyAdapterError, render_ltx_video
 from .formulas import compute_complexity, compute_render_budget, decide_repair, evaluator_final_score
 from .schemas import (
     ArtifactMetadata,
@@ -286,7 +287,19 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
     store.write_json(out_dir / "context_pack.json", context)
 
     video_path = out_dir / "video.mp4"
-    if _ffmpeg_available():
+    if renderer.lower() in {"comfy", "comfy_ltx", "ltx", "ltxrenderer"}:
+        prompt = (
+            f"{shot.visual_action}. {shot.purpose}. "
+            f"Camera: {shot.camera.get('movement', 'cinematic motion')}. "
+            "Cinematic, coherent, natural motion, detailed scene, no test pattern, no color bars."
+        )
+        try:
+            render_ltx_video(text=prompt, destination=video_path, seconds=chunk.duration, seed=1234 + abs(hash(chunk_id)) % 100000)
+        except ComfyAdapterError as exc:
+            failure_path = out_dir / "video.comfy_failed.txt"
+            failure_path.write_text(str(exc), encoding="utf-8")
+            raise
+    elif _ffmpeg_available():
         result = subprocess.run(
             [
                 "ffmpeg",
@@ -419,6 +432,57 @@ def stitch_mock_shot(store: LocalStore, project_id: str, shot_id: str, chunk_art
             "video": str(video_path),
             "chunks": str([artifact.path for artifact in chunk_artifacts]),
         },
+    )
+    store.write_json(out_dir / "artifact.shot.json", artifact)
+    return artifact
+
+
+def render_comfy_ltx_shot(store: LocalStore, project_id: str, shot_id: str, renderer: str = "ComfyLTXRenderer") -> ArtifactMetadata:
+    project_dir = store.project_dir(project_id)
+    graph = CineGraph.model_validate(store.read_json(project_dir / "cinegraph.json"))
+    shot = next(s for s in graph.shots if s.shot_id == shot_id)
+    out_dir = project_dir / "shots" / shot_id / "final"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = out_dir / "shot.raw.mp4"
+    final_path = out_dir / "shot.mp4"
+    source_seconds = min(shot.duration, 2.92)
+    prompt = (
+        f"{shot.visual_action}. {shot.purpose}. "
+        f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "
+        "Cinematic realistic video, coherent motion, natural lighting, no color bars, no test pattern."
+    )
+    render_ltx_video(text=prompt, destination=raw_path, seconds=source_seconds, seed=1234 + abs(hash(shot_id)) % 100000)
+    if _ffmpeg_available() and shot.duration > source_seconds and raw_path.exists():
+        ratio = shot.duration / source_seconds
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(raw_path),
+                "-filter:v",
+                f"setpts={ratio:.6f}*PTS",
+                "-an",
+                "-pix_fmt",
+                "yuv420p",
+                str(final_path),
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode != 0 or not final_path.exists():
+            shutil.copy2(raw_path, final_path)
+    else:
+        shutil.copy2(raw_path, final_path)
+
+    artifact = ArtifactMetadata(
+        artifact_id=f"art_{shot_id}_shot_video",
+        type="video_shot",
+        path=str(final_path),
+        renderer=renderer,
+        input_context={"shot_id": shot_id, "source_seconds": source_seconds, "target_seconds": shot.duration, "prompt": prompt},
+        outputs={"video": str(final_path), "raw_video": str(raw_path)},
     )
     store.write_json(out_dir / "artifact.shot.json", artifact)
     return artifact

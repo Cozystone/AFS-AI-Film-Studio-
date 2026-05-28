@@ -11,7 +11,18 @@ if (Test-Path $logFile) {
     Remove-Item -LiteralPath $logFile -Force
 }
 
-$process = Start-Process -WindowStyle Hidden -PassThru -FilePath "cloudflared" -ArgumentList @(
+$cloudflared = (Get-Command cloudflared -ErrorAction SilentlyContinue).Source
+if (-not $cloudflared) {
+    $candidate = "C:\Program Files (x86)\cloudflared\cloudflared.exe"
+    if (Test-Path $candidate) {
+        $cloudflared = $candidate
+    }
+}
+if (-not $cloudflared) {
+    throw "cloudflared executable was not found. Install Cloudflare Tunnel or add cloudflared to PATH."
+}
+
+$process = Start-Process -WindowStyle Hidden -PassThru -FilePath $cloudflared -ArgumentList @(
     "tunnel",
     "--url",
     "http://127.0.0.1:$port",

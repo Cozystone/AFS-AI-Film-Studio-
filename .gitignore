@@ -21,3 +21,4 @@ storage/outputs/*
 !storage/outputs/.gitkeep
 storage/models/*
 !storage/models/.gitkeep
+services/orchestrator/storage/

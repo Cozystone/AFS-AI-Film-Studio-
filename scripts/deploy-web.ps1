@@ -10,6 +10,7 @@ if (Test-Path $orchestratorUrlFile) {
     $orchestratorUrl = (Get-Content $orchestratorUrlFile -Raw).Trim()
     if ($orchestratorUrl) {
         $deployArgs += @("--env", "ORCHESTRATOR_URL=$orchestratorUrl")
+        $deployArgs += @("--env", "NEXT_PUBLIC_ORCHESTRATOR_URL=$orchestratorUrl")
         Write-Output "Using orchestrator: $orchestratorUrl"
     }
 }

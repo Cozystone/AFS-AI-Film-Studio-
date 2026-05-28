@@ -311,7 +311,7 @@ export default function Home() {
       for (const shot of planned.shots) {
         await request(`/api/shots/${shot.shot_id}/render`, {
           method: "POST",
-          body: JSON.stringify({ preset: "preview", renderer: "mock", audio: true }),
+          body: JSON.stringify({ preset: "preview", renderer: "comfy_ltx", audio: true }),
         });
       }
 

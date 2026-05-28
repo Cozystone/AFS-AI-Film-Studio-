@@ -11,6 +11,7 @@ from .pipeline import (
     mock_plan,
     render_mock_audio,
     render_mock_chunk,
+    render_comfy_ltx_shot,
     stitch_project_movie,
     stitch_mock_shot,
     update_job_progress,
@@ -206,6 +207,19 @@ def render_chunk(chunk_id: str, payload: RenderRequest) -> dict:
 def render_shot(shot_id: str, payload: RenderRequest) -> dict:
     project_id, graph = _find_project_for_shot(shot_id)
     job = create_job(store, JobType.STITCH_SHOT, shot_id, project_id)
+    if payload.renderer.lower() in {"comfy", "comfy_ltx", "ltx", "ltxrenderer"}:
+        update_job_progress(store, job, 0.05)
+        shot_artifact = render_comfy_ltx_shot(store, project_id, shot_id, payload.renderer)
+        update_job_progress(store, job, 0.95)
+        complete_job(store, job, [shot_artifact.path])
+        return {
+            "shot_id": shot_id,
+            "artifacts": [],
+            "evaluations": [],
+            "stitched_artifact": shot_artifact,
+            "preview_artifact_id": shot_artifact.artifact_id,
+            "preview_url": f"/api/artifacts/{shot_artifact.artifact_id}/media",
+        }
     artifacts = []
     evaluations = []
     shot_chunks = [chunk for chunk in graph.chunks if chunk.shot_id == shot_id]
