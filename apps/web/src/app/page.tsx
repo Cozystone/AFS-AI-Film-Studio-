@@ -181,6 +181,14 @@ const translations = {
     remaining: "Remaining",
     noJobs: "No jobs yet.",
     workflow: "Workflow",
+    guide: "Guide",
+    guideStart: "Start on the left: enter a script and create the CineGraph.",
+    guideSelect: "Use the shot tree to choose the cut you want to work on.",
+    guideWork: "Use the center panel for keyframes, render, preview, audio, and export.",
+    guideInspect: "Use the right panel to monitor status, jobs, system usage, world state, and audio events.",
+    navStart: "Start",
+    navStoryboard: "Storyboard",
+    navMonitor: "Monitor",
     nextAction: "Next Action",
     stepProject: "Project",
     stepShot: "Shot",
@@ -258,6 +266,14 @@ const translations = {
     remaining: "남은 시간",
     noJobs: "아직 작업이 없습니다.",
     workflow: "생성 순서",
+    guide: "초보자 가이드",
+    guideStart: "왼쪽에서 시작하세요. 시나리오를 입력하고 CineGraph를 생성합니다.",
+    guideSelect: "샷 트리에서 작업할 컷을 선택합니다.",
+    guideWork: "가운데에서 키프레임, 렌더, 프리뷰, 오디오, 내보내기를 진행합니다.",
+    guideInspect: "오른쪽에서 상태, 작업 큐, 시스템 사용량, 월드 상태, 오디오 이벤트를 확인합니다.",
+    navStart: "시작",
+    navStoryboard: "스토리보드",
+    navMonitor: "모니터링",
     nextAction: "다음 단계",
     stepProject: "프로젝트",
     stepShot: "샷 선택",
@@ -435,7 +451,7 @@ export default function Home() {
     let active = true;
 
     async function loadPreview() {
-      if (!selectedShot || !orchestratorUrl) {
+      if (!selectedShot || !orchestratorUrl || !latestRenderJob) {
         setPreviewUrl(null);
         return;
       }
@@ -455,7 +471,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [orchestratorUrl, request, selectedShot]);
+  }, [latestRenderJob, orchestratorUrl, request, selectedShot]);
 
   async function createAndPlan(event: FormEvent) {
     event.preventDefault();
@@ -572,6 +588,11 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <nav className="hidden items-center gap-1 rounded-md border border-slate-700 p-1 text-sm md:flex">
+              <a href="#start" className="rounded px-3 py-1.5 text-slate-300 hover:bg-slate-800">{t.navStart}</a>
+              <a href="#storyboard" className="rounded px-3 py-1.5 text-slate-300 hover:bg-slate-800">{t.navStoryboard}</a>
+              <a href="#monitor" className="rounded px-3 py-1.5 text-slate-300 hover:bg-slate-800">{t.navMonitor}</a>
+            </nav>
             <div className="flex items-center rounded-md border border-slate-700 p-1 text-sm">
               <button
                 onClick={() => setLanguage("ko")}
@@ -640,7 +661,17 @@ export default function Home() {
       </section>
 
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[340px_1fr_340px]">
-        <section className="space-y-4">
+        <section id="start" className="space-y-4 scroll-mt-24">
+          <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
+            <h2 className="mb-3 font-medium">{t.guide}</h2>
+            <ol className="space-y-2 text-sm text-slate-300">
+              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideStart}</li>
+              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideSelect}</li>
+              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideWork}</li>
+              <li className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">{t.guideInspect}</li>
+            </ol>
+          </section>
+
           <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
             <label className="block text-sm text-slate-300">
               {t.orchestratorUrl}
@@ -734,7 +765,7 @@ export default function Home() {
           </section>
         </section>
 
-        <section className="space-y-4">
+        <section id="storyboard" className="space-y-4 scroll-mt-24">
           <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -803,7 +834,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="space-y-4">
+        <section id="monitor" className="space-y-4 scroll-mt-24">
           <div className="rounded-md border border-slate-800 bg-[#11151b] p-4">
             <div className="mb-3 flex items-center gap-2">
               <RefreshCw size={18} className="text-violet-300" />
