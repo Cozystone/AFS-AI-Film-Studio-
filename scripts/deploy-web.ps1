@@ -6,7 +6,7 @@ $alias = "afs-ai-film-studio.vercel.app"
 
 Push-Location $webDir
 try {
-    $output = vercel deploy --prod --yes
+    $output = vercel deploy --prod --yes --public
     $output | Write-Output
 
     $deploymentUrl = $null
