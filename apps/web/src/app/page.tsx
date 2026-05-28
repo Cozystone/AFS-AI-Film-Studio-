@@ -87,7 +87,7 @@ type SystemUsage = {
   };
 };
 
-const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "";
+const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
 
 const samplePrompt =
   "Two teenagers find a strange old camera in an abandoned roadside building. The image on the tape shows something that has not happened yet.";
@@ -106,7 +106,7 @@ function initialOrchestratorUrl() {
     return saved;
   }
   return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? "http://localhost:8000"
+    ? "/api/orchestrator"
     : "";
 }
 
@@ -153,7 +153,7 @@ const translations = {
     unavailable: "Unavailable",
     offline: "Orchestrator offline",
     orchestratorUrl: "Orchestrator URL",
-    localOnlyHint: "Connect your local orchestrator or Cloudflare Tunnel URL before running project actions.",
+    localOnlyHint: "AFS uses the hosted proxy automatically. Override this only for direct local testing.",
     saveUrl: "Save URL",
     missingApiUrl: "Set an orchestrator URL first.",
     ready: "Ready",
@@ -207,7 +207,7 @@ const translations = {
     unavailable: "사용 불가",
     offline: "오케스트레이터 오프라인",
     orchestratorUrl: "Orchestrator URL",
-    localOnlyHint: "프로젝트 실행 전에 로컬 orchestrator 또는 Cloudflare Tunnel URL을 연결하세요.",
+    localOnlyHint: "AFS가 호스팅 프록시를 자동 사용합니다. 직접 로컬 테스트할 때만 바꾸세요.",
     saveUrl: "URL 저장",
     missingApiUrl: "먼저 orchestrator URL을 설정하세요.",
     ready: "준비됨",
@@ -449,7 +449,7 @@ export default function Home() {
                 <input
                   value={orchestratorInput}
                   onChange={(event) => setOrchestratorInput(event.target.value)}
-                  placeholder="http://localhost:8000"
+                  placeholder="/api/orchestrator"
                   className="min-w-0 flex-1 rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
                 />
                 <button

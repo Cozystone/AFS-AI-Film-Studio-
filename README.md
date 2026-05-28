@@ -13,6 +13,12 @@ pip install -r services/orchestrator/requirements.txt
 uvicorn app.main:app --reload --app-dir services/orchestrator
 ```
 
+The default local orchestrator port for the web proxy is `8765`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-orchestrator.ps1
+```
+
 In another shell:
 
 ```powershell
@@ -43,6 +49,20 @@ Deploy and re-assign the clean alias after patches:
 ```powershell
 npm run deploy:web
 ```
+
+For hosted UI access to the local orchestrator:
+
+```powershell
+# terminal 1
+powershell -ExecutionPolicy Bypass -File scripts/start-orchestrator.ps1
+
+# terminal 2
+powershell -ExecutionPolicy Bypass -File scripts/start-cloudflare-tunnel.ps1
+npm run deploy:web
+```
+
+The tunnel URL is saved to `storage/orchestrator-url.txt`; deploys use it as the
+server-side `ORCHESTRATOR_URL` proxy target.
 
 The Vercel CLI is required:
 

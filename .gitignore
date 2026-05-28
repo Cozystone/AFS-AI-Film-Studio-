@@ -12,6 +12,7 @@ build/
 .env.local
 .vercel/
 storage/afs.sqlite
+storage/orchestrator-url.txt
 storage/projects/*
 !storage/projects/.gitkeep
 storage/cache/*

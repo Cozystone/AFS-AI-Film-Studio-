@@ -3,10 +3,20 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $webDir = Join-Path $root "apps\web"
 $alias = "afs-ai-film-studio.vercel.app"
+$orchestratorUrlFile = Join-Path $root "storage\orchestrator-url.txt"
+$deployArgs = @("deploy", "--prod", "--yes", "--public")
+
+if (Test-Path $orchestratorUrlFile) {
+    $orchestratorUrl = (Get-Content $orchestratorUrlFile -Raw).Trim()
+    if ($orchestratorUrl) {
+        $deployArgs += @("--env", "ORCHESTRATOR_URL=$orchestratorUrl")
+        Write-Output "Using orchestrator: $orchestratorUrl"
+    }
+}
 
 Push-Location $webDir
 try {
-    $output = vercel deploy --prod --yes --public
+    $output = & vercel @deployArgs
     $output | Write-Output
 
     $deploymentUrl = $null
