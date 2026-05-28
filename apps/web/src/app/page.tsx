@@ -180,6 +180,21 @@ const translations = {
     estimated: "Estimated",
     remaining: "Remaining",
     noJobs: "No jobs yet.",
+    workflow: "Workflow",
+    nextAction: "Next Action",
+    stepProject: "Project",
+    stepShot: "Shot",
+    stepKeyframes: "Keyframes",
+    stepRender: "Render",
+    stepAudio: "Audio",
+    stepExport: "Export",
+    actionCreate: "Create the project plan first.",
+    actionSelectShot: "Select a shot from the shot tree.",
+    actionKeyframes: "Generate keyframes for the selected shot.",
+    actionRender: "Render the selected shot.",
+    actionAudio: "Add mock audio layers.",
+    actionExport: "Export the project metadata.",
+    actionDone: "Preview is ready. Continue refining or export.",
     cpu: "CPU",
     gpu: "GPU",
     memory: "Memory",
@@ -242,6 +257,21 @@ const translations = {
     estimated: "예상 소요",
     remaining: "남은 시간",
     noJobs: "아직 작업이 없습니다.",
+    workflow: "생성 순서",
+    nextAction: "다음 단계",
+    stepProject: "프로젝트",
+    stepShot: "샷 선택",
+    stepKeyframes: "키프레임",
+    stepRender: "렌더",
+    stepAudio: "오디오",
+    stepExport: "내보내기",
+    actionCreate: "먼저 프로젝트 계획을 생성하세요.",
+    actionSelectShot: "샷 트리에서 샷을 선택하세요.",
+    actionKeyframes: "선택한 샷의 키프레임을 생성하세요.",
+    actionRender: "선택한 샷을 렌더하세요.",
+    actionAudio: "Mock 오디오 레이어를 추가하세요.",
+    actionExport: "프로젝트 메타데이터를 내보내세요.",
+    actionDone: "프리뷰가 준비됐습니다. 계속 수정하거나 내보내세요.",
     cpu: "CPU",
     gpu: "GPU",
     memory: "메모리",
@@ -291,6 +321,31 @@ export default function Home() {
     () => graph?.audio_visual_events.filter((event) => event.shot_id === selectedShot?.shot_id) ?? [],
     [graph, selectedShot?.shot_id],
   );
+  const latestKeyframeJob = jobs.find((job) => job.type === "GENERATE_KEYFRAME" && job.target_id === selectedShot?.shot_id && job.status === "succeeded");
+  const latestRenderJob = jobs.find((job) => job.type === "STITCH_SHOT" && job.target_id === selectedShot?.shot_id && job.status === "succeeded");
+  const latestAudioJob = jobs.find((job) => job.type === "RENDER_AUDIO_LAYER" && job.target_id === selectedShot?.shot_id && job.status === "succeeded");
+  const latestExportJob = jobs.find((job) => job.type === "EXPORT_PROJECT" && job.project_id === project?.project_id && job.status === "succeeded");
+  const workflowSteps = [
+    { key: "project", label: t.stepProject, done: Boolean(project && graph), active: !graph },
+    { key: "shot", label: t.stepShot, done: Boolean(selectedShot), active: Boolean(graph && !selectedShot) },
+    { key: "keyframes", label: t.stepKeyframes, done: Boolean(latestKeyframeJob), active: Boolean(selectedShot && !latestKeyframeJob) },
+    { key: "render", label: t.stepRender, done: Boolean(latestRenderJob || previewUrl), active: Boolean(latestKeyframeJob && !latestRenderJob && !previewUrl) },
+    { key: "audio", label: t.stepAudio, done: Boolean(latestAudioJob), active: Boolean((latestRenderJob || previewUrl) && !latestAudioJob) },
+    { key: "export", label: t.stepExport, done: Boolean(latestExportJob), active: Boolean(latestAudioJob && !latestExportJob) },
+  ];
+  const nextAction = !graph
+    ? t.actionCreate
+    : !selectedShot
+      ? t.actionSelectShot
+      : !latestKeyframeJob
+        ? t.actionKeyframes
+        : !latestRenderJob && !previewUrl
+          ? t.actionRender
+          : !latestAudioJob
+            ? t.actionAudio
+            : !latestExportJob
+              ? t.actionExport
+              : t.actionDone;
 
   const request = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
     if (!orchestratorUrl) {
@@ -541,6 +596,49 @@ export default function Home() {
         </div>
       </header>
 
+      <section className="border-b border-slate-800 bg-[#0d1117]">
+        <div className="mx-auto max-w-7xl px-5 py-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-slate-200">{t.workflow}</p>
+              <p className="text-sm text-emerald-300">{t.nextAction}: {nextAction}</p>
+            </div>
+            <PrimaryWorkflowAction
+              t={t}
+              busy={busy}
+              graphReady={Boolean(graph)}
+              selectedShot={Boolean(selectedShot)}
+              keyframesDone={Boolean(latestKeyframeJob)}
+              renderDone={Boolean(latestRenderJob || previewUrl)}
+              audioDone={Boolean(latestAudioJob)}
+              exportDone={Boolean(latestExportJob)}
+              onCreate={(event) => createAndPlan(event)}
+              onKeyframes={generateKeyframes}
+              onRender={renderShot}
+              onAudio={renderAudio}
+              onExport={exportProject}
+            />
+          </div>
+          <div className="grid gap-2 md:grid-cols-6">
+            {workflowSteps.map((step, index) => (
+              <div
+                key={step.key}
+                className={`rounded-md border px-3 py-2 ${
+                  step.done
+                    ? "border-emerald-400 bg-emerald-400/10"
+                    : step.active
+                      ? "border-amber-300 bg-amber-300/10"
+                      : "border-slate-800 bg-[#11151b]"
+                }`}
+              >
+                <p className="font-mono text-xs text-slate-500">{String(index + 1).padStart(2, "0")}</p>
+                <p className="text-sm font-medium text-slate-100">{step.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[340px_1fr_340px]">
         <section className="space-y-4">
           <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
@@ -759,6 +857,88 @@ function ActionButton({
       className="flex h-9 items-center gap-2 rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-sm text-slate-200 hover:border-emerald-400 disabled:opacity-50"
     >
       {icon}
+      {label}
+    </button>
+  );
+}
+
+function PrimaryWorkflowAction({
+  t,
+  busy,
+  graphReady,
+  selectedShot,
+  keyframesDone,
+  renderDone,
+  audioDone,
+  exportDone,
+  onCreate,
+  onKeyframes,
+  onRender,
+  onAudio,
+  onExport,
+}: {
+  t: Record<string, string>;
+  busy: boolean;
+  graphReady: boolean;
+  selectedShot: boolean;
+  keyframesDone: boolean;
+  renderDone: boolean;
+  audioDone: boolean;
+  exportDone: boolean;
+  onCreate: (event: FormEvent) => void;
+  onKeyframes: () => void;
+  onRender: () => void;
+  onAudio: () => void;
+  onExport: () => void;
+}) {
+  if (!graphReady) {
+    return (
+      <button
+        disabled={busy}
+        onClick={(event) => onCreate(event)}
+        className="flex h-10 items-center gap-2 rounded-md bg-emerald-400 px-4 text-sm font-medium text-slate-950 disabled:opacity-60"
+      >
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+        {t.createCineGraph}
+      </button>
+    );
+  }
+  if (!selectedShot) {
+    return <span className="rounded-md border border-amber-300 px-3 py-2 text-sm text-amber-200">{t.actionSelectShot}</span>;
+  }
+  if (!keyframesDone) {
+    return <WorkflowButton busy={busy} icon={<KeyRound size={16} />} label={t.keyframes} onClick={onKeyframes} />;
+  }
+  if (!renderDone) {
+    return <WorkflowButton busy={busy} icon={<Play size={16} />} label={t.render} onClick={onRender} />;
+  }
+  if (!audioDone) {
+    return <WorkflowButton busy={busy} icon={<Music2 size={16} />} label={t.audio} onClick={onAudio} />;
+  }
+  if (!exportDone) {
+    return <WorkflowButton busy={busy} icon={<Save size={16} />} label={t.export} onClick={onExport} />;
+  }
+  return <span className="rounded-md border border-emerald-400 px-3 py-2 text-sm text-emerald-300">{t.actionDone}</span>;
+}
+
+function WorkflowButton({
+  busy,
+  icon,
+  label,
+  onClick,
+}: {
+  busy: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      disabled={busy}
+      onClick={onClick}
+      className="flex h-10 items-center gap-2 rounded-md bg-emerald-400 px-4 text-sm font-medium text-slate-950 disabled:opacity-60"
+    >
+      {busy ? <Loader2 size={16} className="animate-spin" /> : icon}
       {label}
     </button>
   );
