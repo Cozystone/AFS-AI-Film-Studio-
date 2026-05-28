@@ -32,7 +32,19 @@ The Next.js UI can be deployed to Vercel. The local orchestrator/GPU services
 should remain on the user's PC and be exposed intentionally through Cloudflare
 Tunnel for trusted external testers.
 
-The Vercel CLI is currently expected to be installed separately:
+Current clean Vercel URL:
+
+```text
+https://afs-ai-film-studio.vercel.app
+```
+
+Deploy and re-assign the clean alias after patches:
+
+```powershell
+npm run deploy:web
+```
+
+The Vercel CLI is required:
 
 ```powershell
 npm i -g vercel
