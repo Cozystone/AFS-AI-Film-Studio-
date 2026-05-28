@@ -352,6 +352,78 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
     return artifact, evaluation
 
 
+def stitch_mock_shot(store: LocalStore, project_id: str, shot_id: str, chunk_artifacts: list[ArtifactMetadata], renderer: str = "MockRenderer") -> ArtifactMetadata:
+    project_dir = store.project_dir(project_id)
+    graph = CineGraph.model_validate(store.read_json(project_dir / "cinegraph.json"))
+    shot = next(s for s in graph.shots if s.shot_id == shot_id)
+    out_dir = project_dir / "shots" / shot_id / "final"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    video_path = out_dir / "shot.mp4"
+    chunk_paths = [Path(artifact.path) for artifact in chunk_artifacts if Path(artifact.path).suffix == ".mp4"]
+
+    if _ffmpeg_available() and chunk_paths:
+        concat_list = out_dir / "chunks.txt"
+        concat_list.write_text(
+            "".join(f"file '{path.resolve().as_posix()}'\n" for path in chunk_paths),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(concat_list),
+                "-c",
+                "copy",
+                str(video_path),
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode != 0 or not video_path.exists():
+            fallback = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    f"color=c=0x111827:s=832x480:d={shot.duration}",
+                    "-pix_fmt",
+                    "yuv420p",
+                    str(video_path),
+                ],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if fallback.returncode != 0 or not video_path.exists():
+                video_path = out_dir / "shot.ffmpeg_failed.txt"
+                video_path.write_text("ffmpeg failed; stitched mock shot metadata only\n", encoding="utf-8")
+    else:
+        video_path = out_dir / "shot.ffmpeg_missing.txt"
+        video_path.write_text("ffmpeg not found or no chunk media; stitched mock shot metadata only\n", encoding="utf-8")
+
+    artifact = ArtifactMetadata(
+        artifact_id=f"art_{shot_id}_shot_video",
+        type="video_shot",
+        path=str(video_path),
+        renderer=renderer,
+        input_context={"chunk_artifacts": [artifact.artifact_id for artifact in chunk_artifacts]},
+        outputs={
+            "video": str(video_path),
+            "chunks": str([artifact.path for artifact in chunk_artifacts]),
+        },
+    )
+    store.write_json(out_dir / "artifact.shot.json", artifact)
+    return artifact
+
+
 def render_mock_audio(store: LocalStore, project_id: str, shot_id: str, layers: list[str]) -> list[str]:
     project_dir = store.project_dir(project_id)
     audio_dir = project_dir / "shots" / shot_id / "audio"

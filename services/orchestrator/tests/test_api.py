@@ -37,6 +37,14 @@ def test_project_plan_render_repair_flow() -> None:
     assert rendered.status_code == 200
     assert rendered.json()["artifact"]["type"] == "video_chunk"
 
+    shot_rendered = client.post(f"/api/shots/{shot_id}/render", json={"preset": "preview", "renderer": "mock"})
+    assert shot_rendered.status_code == 200
+    assert shot_rendered.json()["stitched_artifact"]["type"] == "video_shot"
+
+    preview = client.get(f"/api/shots/{shot_id}/preview")
+    assert preview.status_code == 200
+    assert preview.json()["artifact"]["type"] == "video_shot"
+
     repaired = client.post(f"/api/chunks/{chunk_id}/repair", json={"repair_reasons": ["camera_mismatch"], "lock_existing_audio": True})
     assert repaired.status_code == 200
 

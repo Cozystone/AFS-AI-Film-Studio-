@@ -5,7 +5,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .pipeline import complete_job, create_job, mock_plan, render_mock_audio, render_mock_chunk, update_job_progress, write_placeholder_keyframes
+from .pipeline import (
+    complete_job,
+    create_job,
+    mock_plan,
+    render_mock_audio,
+    render_mock_chunk,
+    stitch_mock_shot,
+    update_job_progress,
+    write_placeholder_keyframes,
+)
 from .schemas import (
     AudioRenderRequest,
     CineGraph,
@@ -141,8 +150,9 @@ def get_artifact_media(artifact_id: str) -> FileResponse:
 @app.get("/api/shots/{shot_id}/preview")
 def get_shot_preview(shot_id: str) -> dict:
     project_id, _ = _find_project_for_shot(shot_id)
-    shot_dir = store.project_dir(project_id) / "shots" / shot_id / "chunks"
-    artifacts = sorted(shot_dir.rglob("artifact.video.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    shot_dir = store.project_dir(project_id) / "shots" / shot_id
+    final_artifacts = sorted((shot_dir / "final").glob("artifact.shot.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    artifacts = final_artifacts
     for artifact_path in artifacts:
         artifact = store.read_json(artifact_path)
         media_path = store.root.parent / artifact.get("path", "")
@@ -188,16 +198,18 @@ def render_shot(shot_id: str, payload: RenderRequest) -> dict:
         artifact, evaluation = render_mock_chunk(store, project_id, chunk.chunk_id, payload.renderer)
         artifacts.append(artifact)
         evaluations.append(evaluation)
-        update_job_progress(store, job, min(index / total, 0.95))
-    outputs = [artifact.path for artifact in artifacts]
+        update_job_progress(store, job, min(0.75 * (index / total), 0.75))
+    shot_artifact = stitch_mock_shot(store, project_id, shot_id, artifacts, payload.renderer)
+    update_job_progress(store, job, 0.95)
+    outputs = [artifact.path for artifact in artifacts] + [shot_artifact.path]
     complete_job(store, job, outputs)
-    preview = next((artifact for artifact in artifacts if artifact.path.endswith(".mp4")), None)
     return {
         "shot_id": shot_id,
         "artifacts": artifacts,
         "evaluations": evaluations,
-        "preview_artifact_id": preview.artifact_id if preview else None,
-        "preview_url": f"/api/artifacts/{preview.artifact_id}/media" if preview else None,
+        "stitched_artifact": shot_artifact,
+        "preview_artifact_id": shot_artifact.artifact_id if shot_artifact.path.endswith(".mp4") else None,
+        "preview_url": f"/api/artifacts/{shot_artifact.artifact_id}/media" if shot_artifact.path.endswith(".mp4") else None,
     }
 
 
