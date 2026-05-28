@@ -16,7 +16,7 @@ import {
   Wand2,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Project = {
   project_id: string;
@@ -87,12 +87,28 @@ type SystemUsage = {
   };
 };
 
-const apiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "http://localhost:8000";
+const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "";
 
 const samplePrompt =
   "Two teenagers find a strange old camera in an abandoned roadside building. The image on the tape shows something that has not happened yet.";
 
 const keyframeSlots = ["first", "middle", "last"] as const;
+
+function initialOrchestratorUrl() {
+  if (configuredApiBase) {
+    return configuredApiBase;
+  }
+  if (typeof window === "undefined") {
+    return "";
+  }
+  const saved = window.localStorage.getItem("afs.orchestratorUrl");
+  if (saved) {
+    return saved;
+  }
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:8000"
+    : "";
+}
 
 const translations = {
   en: {
@@ -136,6 +152,10 @@ const translations = {
     disk: "Disk",
     unavailable: "Unavailable",
     offline: "Orchestrator offline",
+    orchestratorUrl: "Orchestrator URL",
+    localOnlyHint: "Connect your local orchestrator or Cloudflare Tunnel URL before running project actions.",
+    saveUrl: "Save URL",
+    missingApiUrl: "Set an orchestrator URL first.",
     ready: "Ready",
     creatingProject: "Creating local project",
     generatingGraph: "Generating CineGraph",
@@ -186,6 +206,10 @@ const translations = {
     disk: "디스크",
     unavailable: "사용 불가",
     offline: "오케스트레이터 오프라인",
+    orchestratorUrl: "Orchestrator URL",
+    localOnlyHint: "프로젝트 실행 전에 로컬 orchestrator 또는 Cloudflare Tunnel URL을 연결하세요.",
+    saveUrl: "URL 저장",
+    missingApiUrl: "먼저 orchestrator URL을 설정하세요.",
     ready: "준비됨",
     creatingProject: "로컬 프로젝트 생성 중",
     generatingGraph: "CineGraph 생성 중",
@@ -199,6 +223,8 @@ const translations = {
 
 export default function Home() {
   const [language, setLanguage] = useState<Language>("ko");
+  const [orchestratorUrl, setOrchestratorUrl] = useState(initialOrchestratorUrl);
+  const [orchestratorInput, setOrchestratorInput] = useState(initialOrchestratorUrl);
   const [title, setTitle] = useState("Last Tape");
   const [scriptPrompt, setScriptPrompt] = useState(samplePrompt);
   const [styleHint, setStyleHint] = useState("early 2000s camcorder, lo-fi indie film");
@@ -222,8 +248,11 @@ export default function Home() {
     [graph, selectedShot?.shot_id],
   );
 
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${apiBase}${path}`, {
+  const request = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
+    if (!orchestratorUrl) {
+      throw new Error(t.missingApiUrl);
+    }
+    const response = await fetch(`${orchestratorUrl}${path}`, {
       headers: { "Content-Type": "application/json" },
       ...init,
     });
@@ -231,12 +260,28 @@ export default function Home() {
       throw new Error(await response.text());
     }
     return response.json();
+  }, [orchestratorUrl, t.missingApiUrl]);
+
+  function saveOrchestratorUrl() {
+    const normalized = orchestratorInput.trim().replace(/\/$/, "");
+    setOrchestratorUrl(normalized);
+    if (normalized) {
+      window.localStorage.setItem("afs.orchestratorUrl", normalized);
+    } else {
+      window.localStorage.removeItem("afs.orchestratorUrl");
+    }
+    setStatus(normalized ? `${t.orchestratorUrl}: ${normalized}` : t.missingApiUrl);
   }
 
   useEffect(() => {
     let active = true;
 
     async function loadUsage() {
+      if (!orchestratorUrl) {
+        setUsage(null);
+        setUsageError(t.localOnlyHint);
+        return;
+      }
       try {
         const nextUsage = await request<SystemUsage>("/api/system/usage");
         if (active) {
@@ -257,7 +302,7 @@ export default function Home() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [t.offline]);
+  }, [orchestratorUrl, request, t.localOnlyHint, t.offline]);
 
   async function createAndPlan(event: FormEvent) {
     event.preventDefault();
@@ -389,7 +434,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2 rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-300">
               <Server size={16} />
-              <span>{apiBase}</span>
+              <span>{orchestratorUrl || t.missingApiUrl}</span>
             </div>
           </div>
         </div>
@@ -397,6 +442,28 @@ export default function Home() {
 
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[340px_1fr_340px]">
         <section className="space-y-4">
+          <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
+            <label className="block text-sm text-slate-300">
+              {t.orchestratorUrl}
+              <div className="mt-1 flex gap-2">
+                <input
+                  value={orchestratorInput}
+                  onChange={(event) => setOrchestratorInput(event.target.value)}
+                  placeholder="http://localhost:8000"
+                  className="min-w-0 flex-1 rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
+                />
+                <button
+                  type="button"
+                  onClick={saveOrchestratorUrl}
+                  className="h-10 rounded-md bg-emerald-400 px-3 text-sm font-medium text-slate-950"
+                >
+                  {t.saveUrl}
+                </button>
+              </div>
+            </label>
+            <p className="mt-2 text-xs leading-5 text-slate-500">{t.localOnlyHint}</p>
+          </section>
+
           <form onSubmit={createAndPlan} className="rounded-md border border-slate-800 bg-[#11151b] p-4">
             <div className="mb-4 flex items-center gap-2">
               <Wand2 size={18} className="text-emerald-400" />
