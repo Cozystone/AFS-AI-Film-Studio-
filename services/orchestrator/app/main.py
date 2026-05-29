@@ -336,7 +336,7 @@ def export_project(project_id: str, payload: ExportRequest) -> dict:
         "include_audio": payload.include_audio,
         "status": "mock_export_ready",
         "artifact_id": artifact.artifact_id,
-        "media_url": f"/api/artifacts/{artifact.artifact_id}/media" if artifact.path.endswith(".mp4") else None,
+        "media_url": f"/api/projects/{project.project_id}/artifacts/{artifact.artifact_id}/media" if artifact.path.endswith(".mp4") else None,
     }
     store.write_json(path.with_suffix(".json"), sidecar)
     complete_job(store, job, [artifact.path, str(path.with_suffix(".json"))])
@@ -344,7 +344,7 @@ def export_project(project_id: str, payload: ExportRequest) -> dict:
         "export_path": artifact.path,
         "metadata_path": str(path.with_suffix(".json")),
         "artifact": artifact,
-        "media_url": sidecar["media_url"],
+        "media_url": f"/api/projects/{project.project_id}/artifacts/{artifact.artifact_id}/media" if artifact.path.endswith(".mp4") else None,
     }
 
 

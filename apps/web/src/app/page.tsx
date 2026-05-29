@@ -158,6 +158,8 @@ const copy = {
     open: "열기",
     finalMovie: "최종 영화",
     shotPreview: "샷 프리뷰",
+    buildPreview: "통합 프리뷰 만들기",
+    partialPreviewHint: "완성된 샷들을 하나의 프리뷰로 묶습니다.",
     close: "닫기",
   },
   en: {
@@ -213,6 +215,8 @@ const copy = {
     open: "Open",
     finalMovie: "Final movie",
     shotPreview: "Shot preview",
+    buildPreview: "Build stitched preview",
+    partialPreviewHint: "Stitch completed shots into one preview.",
     close: "Close",
   },
 } satisfies Record<Language, Record<string, string>>;
@@ -243,6 +247,7 @@ export default function Home() {
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [albumOpen, setAlbumOpen] = useState(false);
   const [selectedGalleryItem, setSelectedGalleryItem] = useState<GalleryItem | null>(null);
+  const [stitchingProjectId, setStitchingProjectId] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const latestJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
@@ -399,6 +404,26 @@ export default function Home() {
     }
   }
 
+  async function buildStitchedPreview(projectId: string) {
+    setStitchingProjectId(projectId);
+    setStatus(t.exporting);
+    try {
+      const exported = await request<{ media_url: string | null }>(`/api/projects/${projectId}/export`, {
+        method: "POST",
+        body: JSON.stringify({ format: "mp4", resolution: "1280x720", include_audio: true }),
+      });
+      if (exported.media_url) {
+        setMoviePreviewUrl(`${orchestratorUrl}${exported.media_url}`);
+      }
+      await loadGallery();
+      setStatus(t.complete);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Export failed");
+    } finally {
+      setStitchingProjectId(null);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#0b0d10] text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-800 bg-[#0b0d10]/95 backdrop-blur">
@@ -523,6 +548,8 @@ export default function Home() {
             selectedId={selectedGalleryItem?.artifact_id ?? null}
             onSelect={setSelectedGalleryItem}
             onOpenAlbum={() => setAlbumOpen(true)}
+            onBuildPreview={buildStitchedPreview}
+            stitchingProjectId={stitchingProjectId}
           />
         </aside>
       </div>
@@ -591,6 +618,8 @@ function ResultsRail({
   selectedId,
   onSelect,
   onOpenAlbum,
+  onBuildPreview,
+  stitchingProjectId,
 }: {
   items: GalleryItem[];
   t: Record<string, string>;
@@ -598,7 +627,11 @@ function ResultsRail({
   selectedId: string | null;
   onSelect: (item: GalleryItem) => void;
   onOpenAlbum: () => void;
+  onBuildPreview: (projectId: string) => void;
+  stitchingProjectId: string | null;
 }) {
+  const stitchCandidate = findStitchCandidate(items);
+
   return (
     <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -618,6 +651,23 @@ function ResultsRail({
           {t.album}
         </button>
       </div>
+      {stitchCandidate ? (
+        <div className="mb-3 rounded-md border border-emerald-500/30 bg-emerald-950/20 p-3">
+          <p className="truncate text-sm font-medium text-slate-100">{stitchCandidate.title}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            {stitchCandidate.shotCount} {t.shotPreview} · {t.partialPreviewHint}
+          </p>
+          <button
+            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-3 text-sm font-semibold text-slate-950 disabled:opacity-60"
+            type="button"
+            disabled={stitchingProjectId === stitchCandidate.projectId}
+            onClick={() => onBuildPreview(stitchCandidate.projectId)}
+          >
+            {stitchingProjectId === stitchCandidate.projectId ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />}
+            {t.buildPreview}
+          </button>
+        </div>
+      ) : null}
       {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
       <div className="space-y-3">
         {items.map((item) => (
@@ -677,6 +727,19 @@ function GalleryCard({
       </div>
     </article>
   );
+}
+
+function findStitchCandidate(items: GalleryItem[]) {
+  const projectIds = Array.from(new Set(items.map((item) => item.project_id)));
+  for (const projectId of projectIds) {
+    const projectItems = items.filter((item) => item.project_id === projectId);
+    const hasFinal = projectItems.some((item) => item.type === "final_movie" || item.type === "video_project");
+    const shotCount = projectItems.filter((item) => item.type === "video_shot").length;
+    if (!hasFinal && shotCount > 0) {
+      return { projectId, shotCount, title: projectItems[0]?.project_title ?? projectId };
+    }
+  }
+  return null;
 }
 
 function AlbumView({
