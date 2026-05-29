@@ -35,6 +35,82 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
 
+CONTACT_TERMS = (
+    "knife",
+    "knives",
+    "blade",
+    "blades",
+    "sword",
+    "swords",
+    "dagger",
+    "clash",
+    "strike",
+    "sparks",
+    "contact",
+    "칼",
+    "검",
+    "날",
+    "부딪",
+    "맞닿",
+    "충돌",
+    "스파크",
+)
+
+
+def _contains_contact_action(text: str) -> bool:
+    lowered = text.lower()
+    return any(term in lowered for term in CONTACT_TERMS)
+
+
+def _hero_prop_for_script(script: str) -> Prop:
+    if _contains_contact_action(script):
+        return Prop(
+            prop_id="hero_blade",
+            name="Hero Blade",
+            description="a consistent sharp metal blade with a clean silhouette, visible edge, stable handle, and clear contact point",
+            importance="high",
+        )
+    return Prop(
+        prop_id="hero_prop",
+        name="Hero Prop",
+        description="recurring prop used to preserve continuity",
+        importance="high",
+    )
+
+
+def _continuity_bible(project: Project, graph: CineGraph | None = None) -> str:
+    if graph:
+        characters = "; ".join(
+            f"{character.name}: {character.appearance}, wardrobe: {character.wardrobe}"
+            for character in graph.world_state.characters.values()
+        )
+        locations = "; ".join(
+            f"{location.name}: {location.description}, lighting: {location.lighting}"
+            for location in graph.world_state.locations.values()
+        )
+        props = "; ".join(f"{prop.name}: {prop.description}" for prop in graph.world_state.props.values())
+        style = graph.world_state.camera_style.get("format", project.style.visual)
+    else:
+        characters = "same protagonist, same face, same wardrobe, same body shape across every shot"
+        locations = f"same primary location and lighting: {project.style.visual}"
+        props = "same recurring hero prop"
+        style = project.style.visual
+    return (
+        f"VISUAL CONTINUITY LOCK. {characters}. {locations}. {props}. "
+        f"Camera/style must stay consistent: {style}. "
+        "Do not change character identity, wardrobe, location layout, prop shape, or lighting palette between shots."
+    )
+
+
+def _contact_detail_prompt(text: str) -> str:
+    if not _contains_contact_action(text):
+        return ""
+    return (
+        "CONTACT-CRITICAL ACTION. Keep the blade or striking object crisp and physically separate. "
+        "Show the exact contact point clearly, with two distinct hard edges, stable hands, and no melted metal, no fused objects, no smeared impact."
+    )
+
+
 def create_job(store: LocalStore, job_type: JobType, target_id: str, project_id: str | None = None) -> Job:
     estimates = {
         JobType.PLAN_PROJECT: 8.0,
@@ -96,22 +172,17 @@ def mock_plan(project: Project) -> CineGraph:
     character = Character(
         character_id="person_a",
         name="Person A",
-        appearance="consistent protagonist derived from the script",
-        wardrobe="locked wardrobe from the initial concept",
+        appearance="same protagonist from the script, consistent face, hair, body shape, and age in every shot",
+        wardrobe="locked wardrobe from the initial concept, unchanged color and silhouette",
         personality="focused and emotionally readable",
     )
+    prop = _hero_prop_for_script(project.script_prompt)
     location = Location(
         location_id="primary_location",
         name="Primary Location",
         description=f"main cinematic location for: {project.script_prompt[:120]}",
         lighting=project.style.visual or "controlled cinematic practical lighting",
-        persistent_props=["hero_prop"],
-    )
-    prop = Prop(
-        prop_id="hero_prop",
-        name="Hero Prop",
-        description="recurring prop used to preserve continuity",
-        importance="high",
+        persistent_props=[prop.prop_id],
     )
     world = WorldState(
         project_id=project.project_id,
@@ -124,6 +195,7 @@ def mock_plan(project: Project) -> CineGraph:
             "format": project.style.visual or "cinematic local preview",
             "stability": "intentional handheld",
             "color": "consistent look across shots",
+            "continuity_bible": _continuity_bible(project),
         },
     )
 
@@ -145,17 +217,18 @@ def mock_plan(project: Project) -> CineGraph:
                 "shot_size": "medium shot" if idx % 2 == 0 else "close-up",
                 "movement": "slow push-in" if idx == shot_count - 1 else "controlled handheld drift",
                 "lens_feel": "naturalistic local preview",
-                "target": "person_a and hero_prop",
+                "target": f"person_a and {prop.prop_id}",
                 "stability": "slightly shaky",
             },
             visual_action=f"story action beat {idx + 1}: {project.script_prompt[:80]}",
             characters=["person_a"],
-            props=["hero_prop"],
+            props=[prop.prop_id],
             location="primary_location",
             continuity_rules=[
                 "person_a visual identity remains locked",
-                "hero_prop remains visible when referenced",
+                f"{prop.prop_id} shape, material, size, and position remain consistent when referenced",
                 "primary_location lighting stays consistent",
+                "do not introduce a new character, new wardrobe, new location, or new prop design",
             ],
         )
         shots.append(shot)
@@ -313,9 +386,15 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
 
     video_path = out_dir / "video.mp4"
     if renderer.lower() in {"comfy", "comfy_ltx", "ltx", "ltxrenderer"}:
+        project = store.get_project(project_id)
+        continuity = _continuity_bible(project, graph)
+        contact = _contact_detail_prompt(f"{shot.visual_action} {project.script_prompt}")
         prompt = (
+            f"{continuity} "
             f"{shot.visual_action}. {shot.purpose}. "
             f"Camera: {shot.camera.get('movement', 'cinematic motion')}. "
+            f"{contact} "
+            f"Continuity rules: {'; '.join(shot.continuity_rules)}. "
             "Cinematic, coherent, natural motion, detailed scene, grounded live-action footage."
         )
         try:
@@ -445,6 +524,7 @@ def render_comfy_ltx_shot(
     preset: str = "preview",
 ) -> ArtifactMetadata:
     project_dir = store.project_dir(project_id)
+    project = store.get_project(project_id)
     graph = CineGraph.model_validate(store.read_json(project_dir / "cinegraph.json"))
     shot = next(s for s in graph.shots if s.shot_id == shot_id)
     out_dir = project_dir / "shots" / shot_id / "final"
@@ -470,13 +550,22 @@ def render_comfy_ltx_shot(
         "ultra": 1.0,
     }
     preset_key = preset.lower()
+    contact_critical = _contains_contact_action(f"{project.script_prompt} {shot.visual_action}")
     source_seconds = min(
         shot.duration,
-        max(source_limits.get(preset_key, 1.75), shot.duration * speed_floor.get(preset_key, 0.8)),
+        shot.duration
+        if contact_critical
+        else max(source_limits.get(preset_key, 1.75), shot.duration * speed_floor.get(preset_key, 0.8)),
     )
+    render_preset = "balanced" if contact_critical and preset_key in {"turbo", "fast", "draft", "preview"} else preset
+    continuity = _continuity_bible(project, graph)
+    contact = _contact_detail_prompt(f"{project.script_prompt} {shot.visual_action}")
     prompt = (
+        f"{continuity} "
         f"{shot.visual_action}. {shot.purpose}. "
         f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "
+        f"{contact} "
+        f"Continuity rules: {'; '.join(shot.continuity_rules)}. "
         "Cinematic realistic video, coherent motion, natural lighting, grounded live-action footage."
     )
     render_ltx_video(
@@ -484,7 +573,7 @@ def render_comfy_ltx_shot(
         destination=raw_path,
         seconds=source_seconds,
         seed=1234 + abs(hash(shot_id)) % 100000,
-        preset=preset,
+        preset=render_preset,
         video_only=True,
     )
     if _ffmpeg_available() and shot.duration > source_seconds and raw_path.exists():
@@ -516,7 +605,14 @@ def render_comfy_ltx_shot(
         type="video_shot",
         path=str(final_path),
         renderer=renderer,
-        input_context={"shot_id": shot_id, "source_seconds": source_seconds, "target_seconds": shot.duration, "prompt": prompt},
+        input_context={
+            "shot_id": shot_id,
+            "source_seconds": source_seconds,
+            "target_seconds": shot.duration,
+            "prompt": prompt,
+            "contact_critical": contact_critical,
+            "render_preset": render_preset,
+        },
         outputs={"video": str(final_path), "raw_video": str(raw_path)},
     )
     store.write_json(out_dir / "artifact.shot.json", artifact)
