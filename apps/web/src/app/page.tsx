@@ -537,7 +537,7 @@ function selectFinalOutput(item: GalleryItem) {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1600px] gap-4 px-5 py-5 xl:grid-cols-[520px_minmax(0,720px)_340px]">
+      <div className="mx-auto grid max-w-[1700px] gap-4 px-5 py-5 xl:grid-cols-[440px_800px_340px]">
         <section id="make" className="space-y-4">
           <Panel title={t.inputTitle} description={t.inputBody} icon={<Sparkles size={18} className="text-emerald-300" />}>
             <div className="grid gap-3">
@@ -558,100 +558,6 @@ function selectFinalOutput(item: GalleryItem) {
                   className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-3 text-slate-100 outline-none focus:border-emerald-400"
                 />
               </label>
-              <label className="text-sm text-slate-300">
-                {t.visualStyle}
-                <input
-                  value={styleHint}
-                  onChange={(event) => setStyleHint(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
-                />
-              </label>
-              <label className="text-sm text-slate-300">
-                {t.audioStyle}
-                <input
-                  value={audioHint}
-                  onChange={(event) => setAudioHint(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
-                />
-              </label>
-              <div className="grid gap-3 md:grid-cols-2">
-                <SelectField label="Movie source" value={movieSource} onChange={setMovieSource}>
-                  <option value="auto_storyboard">Auto storyboard images</option>
-                  <option value="text_only">Text only</option>
-                  <option value="reference_locked">Reference locked</option>
-                </SelectField>
-                <SelectField label="Storyboard scenes" value={String(storyboardScenes)} onChange={(value) => setStoryboardScenes(Number(value))}>
-                  {[3, 4, 5, 6, 8, 10].map((count) => (
-                    <option key={count} value={count}>
-                      {count} scenes
-                    </option>
-                  ))}
-                </SelectField>
-                <SelectField label="Checkpoint model" value={checkpoint} onChange={setCheckpoint}>
-                  {checkpoints.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </SelectField>
-                <SelectField label="Output quality" value={outputQuality} onChange={setOutputQuality}>
-                  {qualityOptions.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </SelectField>
-                <SelectField label="LoRA" value={lora} onChange={setLora}>
-                  {loras.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </SelectField>
-                <SelectField label="Text encoder" value={textEncoder} onChange={setTextEncoder}>
-                  {textEncoders.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </SelectField>
-                <SelectField label="Aspect" value={aspectRatio} onChange={setAspectRatio}>
-                  <option value="16:9">16:9</option>
-                  <option value="9:16">9:16</option>
-                  <option value="1:1">1:1</option>
-                </SelectField>
-                <SelectField label="Length per cut" value={String(clipLength)} onChange={(value) => setClipLength(Number(value))}>
-                  <option value="2">2 seconds</option>
-                  <option value="3">3 seconds</option>
-                  <option value="5">5 seconds</option>
-                  <option value="8">8 seconds</option>
-                </SelectField>
-                <SelectField label="Style" value={renderStyle} onChange={setRenderStyle}>
-                  <option value="cinematic">Cinematic</option>
-                  <option value="camcorder">Camcorder</option>
-                  <option value="documentary">Documentary</option>
-                  <option value="commercial">Commercial</option>
-                </SelectField>
-                <label className="text-sm text-slate-300">
-                  Seed
-                  <input
-                    value={seed}
-                    onChange={(event) => setSeed(event.target.value)}
-                    placeholder="Empty = random"
-                    className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
-                  />
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-slate-300">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={keepContinuity} onChange={(event) => setKeepContinuity(event.target.checked)} />
-                  Keep character continuity
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={includeAudio} onChange={(event) => setIncludeAudio(event.target.checked)} />
-                  Include audio
-                </label>
-              </div>
               <button
                 className="mt-1 flex h-13 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-base font-semibold text-slate-950 disabled:opacity-60"
                 disabled={busy}
@@ -687,6 +593,36 @@ function selectFinalOutput(item: GalleryItem) {
               )}
             </div>
             <ShotTimeline items={timelineItems} t={t} orchestratorUrl={orchestratorUrl} />
+            <RenderSettingsPanel
+              styleHint={styleHint}
+              setStyleHint={setStyleHint}
+              audioHint={audioHint}
+              setAudioHint={setAudioHint}
+              movieSource={movieSource}
+              setMovieSource={setMovieSource}
+              storyboardScenes={storyboardScenes}
+              setStoryboardScenes={setStoryboardScenes}
+              checkpoint={checkpoint}
+              setCheckpoint={setCheckpoint}
+              outputQuality={outputQuality}
+              setOutputQuality={setOutputQuality}
+              lora={lora}
+              setLora={setLora}
+              textEncoder={textEncoder}
+              setTextEncoder={setTextEncoder}
+              aspectRatio={aspectRatio}
+              setAspectRatio={setAspectRatio}
+              clipLength={clipLength}
+              setClipLength={setClipLength}
+              renderStyle={renderStyle}
+              setRenderStyle={setRenderStyle}
+              seed={seed}
+              setSeed={setSeed}
+              keepContinuity={keepContinuity}
+              setKeepContinuity={setKeepContinuity}
+              includeAudio={includeAudio}
+              setIncludeAudio={setIncludeAudio}
+            />
           </Panel>
 
           <Panel title={t.pcStatus} icon={<Gauge size={18} className="text-rose-300" />}>
@@ -788,6 +724,171 @@ function SelectField({
         {children}
       </select>
     </label>
+  );
+}
+
+function RenderSettingsPanel({
+  styleHint,
+  setStyleHint,
+  audioHint,
+  setAudioHint,
+  movieSource,
+  setMovieSource,
+  storyboardScenes,
+  setStoryboardScenes,
+  checkpoint,
+  setCheckpoint,
+  outputQuality,
+  setOutputQuality,
+  lora,
+  setLora,
+  textEncoder,
+  setTextEncoder,
+  aspectRatio,
+  setAspectRatio,
+  clipLength,
+  setClipLength,
+  renderStyle,
+  setRenderStyle,
+  seed,
+  setSeed,
+  keepContinuity,
+  setKeepContinuity,
+  includeAudio,
+  setIncludeAudio,
+}: {
+  styleHint: string;
+  setStyleHint: (value: string) => void;
+  audioHint: string;
+  setAudioHint: (value: string) => void;
+  movieSource: string;
+  setMovieSource: (value: string) => void;
+  storyboardScenes: number;
+  setStoryboardScenes: (value: number) => void;
+  checkpoint: string;
+  setCheckpoint: (value: string) => void;
+  outputQuality: string;
+  setOutputQuality: (value: string) => void;
+  lora: string;
+  setLora: (value: string) => void;
+  textEncoder: string;
+  setTextEncoder: (value: string) => void;
+  aspectRatio: string;
+  setAspectRatio: (value: string) => void;
+  clipLength: number;
+  setClipLength: (value: number) => void;
+  renderStyle: string;
+  setRenderStyle: (value: string) => void;
+  seed: string;
+  setSeed: (value: string) => void;
+  keepContinuity: boolean;
+  setKeepContinuity: (value: boolean) => void;
+  includeAudio: boolean;
+  setIncludeAudio: (value: boolean) => void;
+}) {
+  return (
+    <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-slate-100">영상 스타일 / 렌더 설정</h3>
+        <p className="text-xs text-slate-500">프리뷰 아래에서 컷 구성과 렌더 옵션을 조정합니다.</p>
+      </div>
+      <div className="grid gap-3">
+        <label className="text-sm text-slate-300">
+          영상 스타일
+          <input
+            value={styleHint}
+            onChange={(event) => setStyleHint(event.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
+          />
+        </label>
+        <label className="text-sm text-slate-300">
+          소리 스타일
+          <input
+            value={audioHint}
+            onChange={(event) => setAudioHint(event.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
+          />
+        </label>
+        <div className="grid gap-3 md:grid-cols-2">
+          <SelectField label="Movie source" value={movieSource} onChange={setMovieSource}>
+            <option value="auto_storyboard">Auto storyboard images</option>
+            <option value="text_only">Text only</option>
+            <option value="reference_locked">Reference locked</option>
+          </SelectField>
+          <SelectField label="Storyboard scenes" value={String(storyboardScenes)} onChange={(value) => setStoryboardScenes(Number(value))}>
+            {[3, 4, 5, 6, 8, 10].map((count) => (
+              <option key={count} value={count}>
+                {count} scenes
+              </option>
+            ))}
+          </SelectField>
+          <SelectField label="Checkpoint model" value={checkpoint} onChange={setCheckpoint}>
+            {checkpoints.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField label="Output quality" value={outputQuality} onChange={setOutputQuality}>
+            {qualityOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField label="LoRA" value={lora} onChange={setLora}>
+            {loras.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField label="Text encoder" value={textEncoder} onChange={setTextEncoder}>
+            {textEncoders.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField label="Aspect" value={aspectRatio} onChange={setAspectRatio}>
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+          </SelectField>
+          <SelectField label="Length per cut" value={String(clipLength)} onChange={(value) => setClipLength(Number(value))}>
+            <option value="2">2 seconds</option>
+            <option value="3">3 seconds</option>
+            <option value="5">5 seconds</option>
+            <option value="8">8 seconds</option>
+          </SelectField>
+          <SelectField label="Style" value={renderStyle} onChange={setRenderStyle}>
+            <option value="cinematic">Cinematic</option>
+            <option value="camcorder">Camcorder</option>
+            <option value="documentary">Documentary</option>
+            <option value="commercial">Commercial</option>
+          </SelectField>
+          <label className="text-sm text-slate-300">
+            Seed
+            <input
+              value={seed}
+              onChange={(event) => setSeed(event.target.value)}
+              placeholder="Empty = random"
+              className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-4 rounded-md border border-slate-800 bg-[#080b0f] p-3 text-sm text-slate-300">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={keepContinuity} onChange={(event) => setKeepContinuity(event.target.checked)} />
+            Keep character continuity
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={includeAudio} onChange={(event) => setIncludeAudio(event.target.checked)} />
+            Include audio
+          </label>
+        </div>
+      </div>
+    </div>
   );
 }
 
