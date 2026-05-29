@@ -4,13 +4,17 @@ import {
   Activity,
   ChevronDown,
   Clapperboard,
+  ExternalLink,
+  Film,
   Gauge,
   Globe2,
+  Images,
   Loader2,
   MonitorPlay,
   Play,
   Server,
   Sparkles,
+  X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -82,6 +86,18 @@ type Job = {
   remaining_sec: number | null;
 };
 
+type GalleryItem = {
+  artifact_id: string;
+  project_id: string;
+  project_title: string;
+  type: string;
+  label: string;
+  renderer: string;
+  created_at: string;
+  media_url: string;
+  duration: number | null;
+};
+
 type Language = "ko" | "en";
 
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
@@ -135,6 +151,14 @@ const copy = {
     audio: "오디오 레이어 생성 중",
     exporting: "최종 영화 파일을 만드는 중",
     complete: "영화 프리뷰 완료",
+    album: "앨범",
+    results: "결과물",
+    latestOutputs: "생성된 영상",
+    noOutputs: "아직 생성된 결과물이 없습니다.",
+    open: "열기",
+    finalMovie: "최종 영화",
+    shotPreview: "샷 프리뷰",
+    close: "닫기",
   },
   en: {
     appName: "AFS",
@@ -182,6 +206,14 @@ const copy = {
     audio: "Generating audio layers",
     exporting: "Creating final movie file",
     complete: "Movie preview ready",
+    album: "Album",
+    results: "Results",
+    latestOutputs: "Generated videos",
+    noOutputs: "No generated outputs yet.",
+    open: "Open",
+    finalMovie: "Final movie",
+    shotPreview: "Shot preview",
+    close: "Close",
   },
 } satisfies Record<Language, Record<string, string>>;
 
@@ -208,6 +240,9 @@ export default function Home() {
   const [usage, setUsage] = useState<SystemUsage | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [albumOpen, setAlbumOpen] = useState(false);
+  const [selectedGalleryItem, setSelectedGalleryItem] = useState<GalleryItem | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const latestJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
@@ -224,6 +259,17 @@ export default function Home() {
     },
     [orchestratorUrl],
   );
+
+  const loadGallery = useCallback(async () => {
+    if (!orchestratorUrl) return;
+    try {
+      const items = await request<GalleryItem[]>("/api/gallery");
+      setGallery(items);
+      setSelectedGalleryItem((current) => current ?? items[0] ?? null);
+    } catch {
+      setGallery([]);
+    }
+  }, [orchestratorUrl, request]);
 
   useEffect(() => {
     let active = true;
@@ -265,6 +311,15 @@ export default function Home() {
       window.clearInterval(interval);
     };
   }, [orchestratorUrl, request]);
+
+  useEffect(() => {
+    const initial = window.setTimeout(loadGallery, 0);
+    const interval = window.setInterval(loadGallery, 5000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
+  }, [loadGallery]);
 
   function saveOrchestratorUrl() {
     const normalized = orchestratorInput.trim().replace(/\/$/, "");
@@ -335,6 +390,7 @@ export default function Home() {
         const preview = await request<{ media_url: string }>(`/api/projects/${created.project_id}/preview`);
         setMoviePreviewUrl(`${orchestratorUrl}${preview.media_url}`);
       }
+      await loadGallery();
       setStatus(t.complete);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Request failed");
@@ -364,6 +420,14 @@ export default function Home() {
               {t.result}
             </a>
             <button
+              className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-200 hover:bg-slate-800"
+              type="button"
+              onClick={() => setAlbumOpen(true)}
+            >
+              <Images size={15} />
+              {t.album}
+            </button>
+            <button
               className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-200"
               type="button"
               onClick={() => setLanguage((current) => (current === "ko" ? "en" : "ko"))}
@@ -375,7 +439,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-5 lg:grid-cols-[0.72fr_1.28fr]">
+      <div className="mx-auto grid max-w-[1700px] gap-4 px-4 py-5 xl:grid-cols-[0.58fr_1.08fr_360px]">
         <section id="make" className="space-y-4">
           <Panel title={t.inputTitle} description={t.inputBody} icon={<Sparkles size={18} className="text-emerald-300" />}>
             <div className="grid gap-3">
@@ -450,6 +514,17 @@ export default function Home() {
             <SystemUsagePanel usage={usage} error={usageError} t={t} />
           </Panel>
         </section>
+
+        <aside className="xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
+          <ResultsRail
+            items={gallery}
+            t={t}
+            orchestratorUrl={orchestratorUrl}
+            selectedId={selectedGalleryItem?.artifact_id ?? null}
+            onSelect={setSelectedGalleryItem}
+            onOpenAlbum={() => setAlbumOpen(true)}
+          />
+        </aside>
       </div>
 
       <section className="mx-auto max-w-[1500px] px-4 pb-8">
@@ -495,7 +570,172 @@ export default function Home() {
           </div>
         ) : null}
       </section>
+      {albumOpen ? (
+        <AlbumView
+          items={gallery}
+          t={t}
+          orchestratorUrl={orchestratorUrl}
+          selectedItem={selectedGalleryItem}
+          onSelect={setSelectedGalleryItem}
+          onClose={() => setAlbumOpen(false)}
+        />
+      ) : null}
     </main>
+  );
+}
+
+function ResultsRail({
+  items,
+  t,
+  orchestratorUrl,
+  selectedId,
+  onSelect,
+  onOpenAlbum,
+}: {
+  items: GalleryItem[];
+  t: Record<string, string>;
+  orchestratorUrl: string;
+  selectedId: string | null;
+  onSelect: (item: GalleryItem) => void;
+  onOpenAlbum: () => void;
+}) {
+  return (
+    <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Film size={18} className="text-emerald-300" />
+          <div>
+            <h2 className="font-semibold text-slate-100">{t.results}</h2>
+            <p className="text-xs text-slate-500">{items.length} {t.latestOutputs}</p>
+          </div>
+        </div>
+        <button
+          className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-200 hover:bg-slate-800"
+          type="button"
+          onClick={onOpenAlbum}
+        >
+          <Images size={15} />
+          {t.album}
+        </button>
+      </div>
+      {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
+      <div className="space-y-3">
+        {items.map((item) => (
+          <GalleryCard
+            key={item.artifact_id}
+            item={item}
+            t={t}
+            orchestratorUrl={orchestratorUrl}
+            selected={item.artifact_id === selectedId}
+            onSelect={() => onSelect(item)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function GalleryCard({
+  item,
+  t,
+  orchestratorUrl,
+  selected,
+  onSelect,
+}: {
+  item: GalleryItem;
+  t: Record<string, string>;
+  orchestratorUrl: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const mediaUrl = `${orchestratorUrl}${item.media_url}`;
+  const isFinal = item.type === "final_movie" || item.type === "video_project";
+  return (
+    <article
+      className={`rounded-md border bg-[#0b0d10] p-3 transition ${
+        selected ? "border-emerald-400/80 shadow-lg shadow-emerald-950/30" : "border-slate-800 hover:border-slate-700"
+      }`}
+    >
+      <button className="w-full text-left" type="button" onClick={onSelect}>
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-100">{item.project_title}</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">{isFinal ? t.finalMovie : `${t.shotPreview} · ${item.label}`}</p>
+          </div>
+          <span className={isFinal ? "rounded border border-emerald-500/50 px-2 py-1 text-xs text-emerald-300" : "rounded border border-slate-700 px-2 py-1 text-xs text-slate-300"}>
+            {isFinal ? "FINAL" : "SHOT"}
+          </span>
+        </div>
+        <video className="aspect-video w-full rounded border border-slate-800 bg-black object-cover" src={mediaUrl} muted preload="metadata" />
+      </button>
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-slate-500">
+        <span className="truncate">{item.renderer}</span>
+        <a className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200" href={mediaUrl} target="_blank" rel="noreferrer">
+          {t.open}
+          <ExternalLink size={12} />
+        </a>
+      </div>
+    </article>
+  );
+}
+
+function AlbumView({
+  items,
+  t,
+  orchestratorUrl,
+  selectedItem,
+  onSelect,
+  onClose,
+}: {
+  items: GalleryItem[];
+  t: Record<string, string>;
+  orchestratorUrl: string;
+  selectedItem: GalleryItem | null;
+  onSelect: (item: GalleryItem) => void;
+  onClose: () => void;
+}) {
+  const active = selectedItem ?? items[0] ?? null;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 p-4 backdrop-blur">
+      <div className="mx-auto flex h-full max-w-[1500px] flex-col rounded-md border border-slate-800 bg-[#11151b]">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Images size={19} className="text-emerald-300" />
+            <div>
+              <h2 className="font-semibold text-slate-100">{t.album}</h2>
+              <p className="text-xs text-slate-500">{items.length} {t.latestOutputs}</p>
+            </div>
+          </div>
+          <button className="grid size-9 place-items-center rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800" type="button" onClick={onClose} aria-label={t.close}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
+          <div className="min-h-0 overflow-hidden rounded-md border border-slate-800 bg-black">
+            {active ? (
+              <video controls className="h-full max-h-[calc(100vh-9rem)] w-full bg-black object-contain" src={`${orchestratorUrl}${active.media_url}`} />
+            ) : (
+              <div className="grid h-full min-h-[420px] place-items-center text-sm text-slate-500">{t.noOutputs}</div>
+            )}
+          </div>
+          <div className="min-h-0 overflow-y-auto">
+            {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
+            <div className="grid gap-3">
+              {items.map((item) => (
+                <GalleryCard
+                  key={item.artifact_id}
+                  item={item}
+                  t={t}
+                  orchestratorUrl={orchestratorUrl}
+                  selected={item.artifact_id === active?.artifact_id}
+                  onSelect={() => onSelect(item)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -149,6 +149,26 @@ def get_artifact_media(artifact_id: str) -> FileResponse:
     return FileResponse(media_path, media_type=media_type, filename=media_path.name)
 
 
+@app.get("/api/projects/{project_id}/artifacts/{artifact_id}/media")
+def get_project_artifact_media(project_id: str, artifact_id: str) -> FileResponse:
+    project_dir = store.project_dir(project_id)
+    for artifact_path in project_dir.rglob("*.json"):
+        if not artifact_path.name.startswith(("artifact.", "foley", "ambience", "music", "dialogue")):
+            continue
+        try:
+            artifact = store.read_json(artifact_path)
+        except Exception:
+            continue
+        if artifact.get("artifact_id") != artifact_id:
+            continue
+        media_path = store.root.parent / artifact.get("path", "")
+        if not media_path.exists() or media_path.suffix not in {".mp4", ".wav"}:
+            raise HTTPException(status_code=404, detail="media file not available")
+        media_type = "video/mp4" if media_path.suffix == ".mp4" else "audio/wav"
+        return FileResponse(media_path, media_type=media_type, filename=media_path.name)
+    raise HTTPException(status_code=404, detail="artifact not found")
+
+
 @app.get("/api/shots/{shot_id}/preview")
 def get_shot_preview(shot_id: str) -> dict:
     project_id, _ = _find_project_for_shot(shot_id)
@@ -181,6 +201,40 @@ def get_project_preview(project_id: str) -> dict:
                 "media_url": f"/api/artifacts/{artifact['artifact_id']}/media",
             }
     raise HTTPException(status_code=404, detail="project preview media not available")
+
+
+@app.get("/api/gallery")
+def list_gallery() -> list[dict]:
+    items: list[dict] = []
+    for project in store.list_projects():
+        project_dir = store.project_dir(project.project_id)
+        artifact_paths = list((project_dir / "exports").glob("artifact.final.json"))
+        artifact_paths.extend((project_dir / "shots").glob("*/final/artifact.shot.json"))
+        for artifact_path in artifact_paths:
+            try:
+                artifact = store.read_json(artifact_path)
+            except Exception:
+                continue
+            media_path = store.root.parent / artifact.get("path", "")
+            if not media_path.exists() or media_path.suffix != ".mp4":
+                continue
+            artifact_type = artifact.get("type", "")
+            shot_id = artifact.get("input_context", {}).get("shot_id")
+            is_final = artifact_type in {"final_movie", "video_project"}
+            items.append(
+                {
+                    "artifact_id": artifact.get("artifact_id"),
+                    "project_id": project.project_id,
+                    "project_title": project.title,
+                    "type": artifact_type,
+                    "label": "Final movie" if is_final else (shot_id or "Shot preview"),
+                    "renderer": artifact.get("renderer"),
+                    "created_at": artifact.get("created_at"),
+                    "media_url": f"/api/projects/{project.project_id}/artifacts/{artifact['artifact_id']}/media",
+                    "duration": project.format.duration if is_final else artifact.get("input_context", {}).get("target_seconds"),
+                }
+            )
+    return sorted(items, key=lambda item: item.get("created_at") or "", reverse=True)
 
 
 @app.post("/api/shots/{shot_id}/keyframes/generate")
