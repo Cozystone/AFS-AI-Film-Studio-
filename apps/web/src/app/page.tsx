@@ -158,6 +158,9 @@ const copy = {
     noFinalOutputs: "아직 통합 영상이 없습니다.",
     editTimeline: "편집 타임라인",
     editTimelineHint: "생성된 샷 조각은 여기에서 순서대로 확인합니다.",
+    sceneTrack: "컷",
+    bridgeTrack: "연결",
+    bridgeClip: "연결 영상",
     open: "열기",
     finalMovie: "최종 영화",
     shotPreview: "샷 프리뷰",
@@ -218,6 +221,9 @@ const copy = {
     noFinalOutputs: "No stitched movies yet.",
     editTimeline: "Edit timeline",
     editTimelineHint: "Generated shot fragments stay here in sequence.",
+    sceneTrack: "Cuts",
+    bridgeTrack: "Bridges",
+    bridgeClip: "Bridge",
     open: "Open",
     finalMovie: "Final movie",
     shotPreview: "Shot preview",
@@ -432,6 +438,13 @@ export default function Home() {
     }
   }
 
+  function selectFinalOutput(item: GalleryItem) {
+    setSelectedGalleryItem(item);
+    if (isFinalGalleryItem(item)) {
+      setMoviePreviewUrl(`${orchestratorUrl}${item.media_url}`);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#0b0d10] text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-800 bg-[#0b0d10]/95 backdrop-blur">
@@ -558,7 +571,7 @@ export default function Home() {
             t={t}
             orchestratorUrl={orchestratorUrl}
             selectedId={selectedGalleryItem?.artifact_id ?? null}
-            onSelect={setSelectedGalleryItem}
+            onSelect={selectFinalOutput}
             onOpenAlbum={() => setAlbumOpen(true)}
             onBuildPreview={buildStitchedPreview}
             stitchingProjectId={stitchingProjectId}
@@ -744,6 +757,8 @@ function GalleryCard({
 }
 
 function ShotTimeline({ items, t, orchestratorUrl }: { items: GalleryItem[]; t: Record<string, string>; orchestratorUrl: string }) {
+  const transitions = buildTransitionItems(items);
+
   return (
     <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -755,20 +770,52 @@ function ShotTimeline({ items, t, orchestratorUrl }: { items: GalleryItem[]; t: 
       </div>
       {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
       {items.length > 0 ? (
-        <div className="flex gap-3 overflow-x-auto pb-1">
-          {items.map((item, index) => (
-            <article key={`${item.project_id}-${item.artifact_id}-${item.label}`} className="w-48 shrink-0 rounded-md border border-slate-800 bg-[#11151b] p-2">
-              <video className="aspect-video w-full rounded border border-slate-800 bg-black object-cover" src={`${orchestratorUrl}${item.media_url}`} muted preload="metadata" />
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="font-mono text-xs text-emerald-300">{String(index + 1).padStart(2, "0")}</span>
-                <span className="truncate text-xs text-slate-400">{item.label}</span>
-              </div>
-            </article>
-          ))}
+        <div className="overflow-x-auto rounded-md border border-slate-800 bg-[#0d1117]">
+          <div className="min-w-max">
+            <div className="grid border-b border-slate-800" style={{ gridTemplateColumns: `44px repeat(${items.length}, 176px)` }}>
+              <div className="grid place-items-center border-r border-slate-800 bg-[#11151b] text-xs text-slate-500">{t.sceneTrack}</div>
+              {items.map((item, index) => (
+                <article key={`${item.project_id}-${item.artifact_id}-${item.label}`} className="border-r border-slate-800 p-2">
+                  <div className="overflow-hidden rounded-md border border-emerald-500/30 bg-slate-900">
+                    <video className="aspect-video w-full bg-black object-cover" src={`${orchestratorUrl}${item.media_url}`} muted preload="metadata" />
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="font-mono text-xs text-emerald-300">{String(index + 1).padStart(2, "0")}</span>
+                      <span className="truncate text-xs text-slate-200">{item.label}</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="grid" style={{ gridTemplateColumns: `44px repeat(${items.length}, 176px)` }}>
+              <div className="grid place-items-center border-r border-slate-800 bg-[#11151b] text-xs text-slate-500">{t.bridgeTrack}</div>
+              {items.map((item, index) => (
+                <div key={`${item.project_id}-${item.artifact_id}-bridge`} className="border-r border-slate-800 p-2">
+                  {transitions[index] ? (
+                    <div className="grid aspect-video place-items-end rounded-md border border-slate-700 bg-gradient-to-b from-[#121a24] to-[#0b0d10] p-2">
+                      <div className="w-full">
+                        <p className="truncate text-xs text-slate-300">{t.bridgeClip}</p>
+                        <p className="mt-1 font-mono text-xs text-slate-500">{transitions[index]}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-video rounded-md border border-dashed border-slate-800 bg-[#0b0d10]" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
   );
+}
+
+function buildTransitionItems(items: GalleryItem[]) {
+  return items.map((item, index) => {
+    const next = items[index + 1];
+    if (!next) return null;
+    return `${item.label} -> ${next.label}`;
+  });
 }
 
 function findStitchCandidate(items: GalleryItem[]) {
