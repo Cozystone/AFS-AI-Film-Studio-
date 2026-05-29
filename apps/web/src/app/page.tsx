@@ -98,6 +98,18 @@ type GalleryItem = {
   duration: number | null;
 };
 
+type ProductionProgress = {
+  active: boolean;
+  completed: boolean;
+  label: string;
+  basePercent: number;
+  segmentPercent: number;
+  taskStartedAt: number;
+  taskEstimateSec: number;
+  startedAt: number;
+  totalEstimateSec: number;
+};
+
 type Language = "ko" | "en";
 
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
@@ -285,10 +297,23 @@ export default function Home() {
   const [selectedGalleryItem, setSelectedGalleryItem] = useState<GalleryItem | null>(null);
   const [stitchingProjectId, setStitchingProjectId] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [progressClock, setProgressClock] = useState(0);
+  const [productionProgress, setProductionProgress] = useState<ProductionProgress>({
+    active: false,
+    completed: false,
+    label: "Ready",
+    basePercent: 0,
+    segmentPercent: 0,
+    taskStartedAt: 0,
+    taskEstimateSec: 1,
+    startedAt: 0,
+    totalEstimateSec: 1,
+  });
 
   const latestJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
   const finalGallery = gallery.filter(isFinalGalleryItem);
   const timelineItems = getTimelineItems(gallery, project?.project_id ?? null);
+  const progressSnapshot = getProductionProgressSnapshot(productionProgress, progressClock);
 
   const request = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -382,6 +407,12 @@ export default function Home() {
     };
   }, [loadGallery]);
 
+  useEffect(() => {
+    if (!productionProgress.active) return;
+    const interval = window.setInterval(() => setProgressClock(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [productionProgress.active]);
+
   function saveOrchestratorUrl() {
     const normalized = orchestratorInput.trim().replace(/\/$/, "");
     setOrchestratorUrl(normalized);
@@ -394,8 +425,30 @@ export default function Home() {
     setMoviePreviewUrl(null);
     setGraph(null);
     setProject(null);
+    const startedAt = Date.now();
+    let totalEstimateSec = estimateMovieSeconds({
+      shotCount: storyboardScenes,
+      checkpoint,
+      outputQuality,
+      includeAudio,
+    });
+    const setMovieTask = (label: string, basePercent: number, segmentPercent: number, taskEstimateSec: number) => {
+      setProductionProgress({
+        active: true,
+        completed: false,
+        label,
+        basePercent,
+        segmentPercent,
+        taskStartedAt: Date.now(),
+        taskEstimateSec,
+        startedAt,
+        totalEstimateSec,
+      });
+      setProgressClock(Date.now());
+    };
     try {
       setStatus(t.creating);
+      setMovieTask("프로젝트 생성", 0, 2, 3);
       const created = await request<{ project_id: string }>("/api/projects", {
         method: "POST",
         body: JSON.stringify({
@@ -412,11 +465,20 @@ export default function Home() {
       setProject(loaded);
 
       setStatus(t.planning);
+      setMovieTask("장면과 컷 설계", 2, 5, 6);
       const planned = await request<CineGraph>(`/api/projects/${created.project_id}/plan`, { method: "POST" });
       setGraph(planned);
+      totalEstimateSec = estimateMovieSeconds({
+        shotCount: planned.shots.length,
+        checkpoint,
+        outputQuality,
+        includeAudio,
+      });
 
       setStatus(t.keyframing);
-      for (const shot of planned.shots) {
+      const keyframeSegment = 8 / Math.max(planned.shots.length, 1);
+      for (const [index, shot] of planned.shots.entries()) {
+        setMovieTask(`키프레임 준비 ${index + 1}/${planned.shots.length}`, 7 + keyframeSegment * index, keyframeSegment, 2);
         await request(`/api/shots/${shot.shot_id}/keyframes/generate`, {
           method: "POST",
           body: JSON.stringify({ slots: ["first", "middle", "last"], renderer: "mock" }),
@@ -424,7 +486,10 @@ export default function Home() {
       }
 
       setStatus(t.rendering);
-      for (const shot of planned.shots) {
+      const renderSegment = 70 / Math.max(planned.shots.length, 1);
+      const renderEstimate = estimateRenderSeconds({ checkpoint, outputQuality });
+      for (const [index, shot] of planned.shots.entries()) {
+        setMovieTask(`영상 렌더 ${index + 1}/${planned.shots.length}`, 15 + renderSegment * index, renderSegment, renderEstimate);
         await request(`/api/shots/${shot.shot_id}/render`, {
           method: "POST",
           body: JSON.stringify({
@@ -441,7 +506,9 @@ export default function Home() {
 
       if (includeAudio) {
         setStatus(t.audio);
-        for (const shot of planned.shots) {
+        const audioSegment = 10 / Math.max(planned.shots.length, 1);
+        for (const [index, shot] of planned.shots.entries()) {
+          setMovieTask(`오디오 레이어 ${index + 1}/${planned.shots.length}`, 85 + audioSegment * index, audioSegment, 3);
           await request(`/api/shots/${shot.shot_id}/audio/render`, {
             method: "POST",
             body: JSON.stringify({ layers: ["foley", "ambience", "music"], adapter: "mock_audio" }),
@@ -450,6 +517,7 @@ export default function Home() {
       }
 
       setStatus(t.exporting);
+      setMovieTask("통합 영상 제작 / 업스케일", includeAudio ? 95 : 85, includeAudio ? 5 : 15, 10 + planned.shots.length);
       const exported = await request<{ media_url: string | null }>(`/api/projects/${created.project_id}/export`, {
         method: "POST",
         body: JSON.stringify({ format: "mp4", resolution: "1280x720", include_audio: includeAudio }),
@@ -463,8 +531,21 @@ export default function Home() {
       }
       await loadGallery();
       setStatus(t.complete);
+      setProductionProgress({
+        active: false,
+        completed: true,
+        label: "완료",
+        basePercent: 100,
+        segmentPercent: 0,
+        taskStartedAt: Date.now(),
+        taskEstimateSec: 1,
+        startedAt,
+        totalEstimateSec: Math.max(1, (Date.now() - startedAt) / 1000),
+      });
+      setProgressClock(Date.now());
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Request failed");
+      setProductionProgress((current) => ({ ...current, active: false, label: "중단됨" }));
     } finally {
       setBusy(false);
     }
@@ -558,6 +639,7 @@ function selectFinalOutput(item: GalleryItem) {
                   className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-3 text-slate-100 outline-none focus:border-emerald-400"
                 />
               </label>
+              <MovieProductionProgress snapshot={progressSnapshot} />
               <button
                 className="mt-1 flex h-13 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-base font-semibold text-slate-950 disabled:opacity-60"
                 disabled={busy}
@@ -724,6 +806,43 @@ function SelectField({
         {children}
       </select>
     </label>
+  );
+}
+
+function MovieProductionProgress({
+  snapshot,
+}: {
+  snapshot: {
+    percent: number;
+    label: string;
+    elapsedSec: number;
+    remainingSec: number;
+    totalEstimateSec: number;
+    active: boolean;
+    completed: boolean;
+  };
+}) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-[#080b0f] p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-100">통합 영화 제작 진행</p>
+          <p className="mt-0.5 text-xs text-slate-500">{snapshot.label}</p>
+        </div>
+        <span className="font-mono text-lg font-semibold text-emerald-300">{snapshot.percent}%</span>
+      </div>
+      <div className="h-3 overflow-hidden rounded bg-slate-800">
+        <div className="h-full rounded bg-emerald-400 transition-[width] duration-700" style={{ width: `${snapshot.percent}%` }} />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500">
+        <span>경과 {formatDuration(snapshot.elapsedSec)}</span>
+        <span>남은 시간 {snapshot.completed ? "0분" : formatDuration(snapshot.remainingSec)}</span>
+        <span>예상 총 {formatDuration(snapshot.totalEstimateSec)}</span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-600">
+        예측: 기획 7%, 키프레임 8%, 영상 렌더 70%, 오디오 10%, 통합/업스케일 5% 가중치와 컷 수, 품질 프리셋을 기준으로 계산합니다.
+      </p>
+    </div>
   );
 }
 
@@ -1263,6 +1382,76 @@ function formatSeconds(value: number | null) {
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatDuration(value: number) {
+  const total = Math.max(0, Math.round(value));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  if (minutes <= 0) return `${seconds}초`;
+  return `${minutes}분 ${seconds.toString().padStart(2, "0")}초`;
+}
+
+function estimateRenderSeconds({ checkpoint, outputQuality }: { checkpoint: string; outputQuality: string }) {
+  if (checkpoint === "mock") return 2;
+  const qualityMultiplier: Record<string, number> = {
+    fast: 0.8,
+    balanced: 1,
+    high: 1.45,
+    ultra: 2.1,
+  };
+  return Math.round(135 * (qualityMultiplier[outputQuality] ?? 1));
+}
+
+function estimateMovieSeconds({
+  shotCount,
+  checkpoint,
+  outputQuality,
+  includeAudio,
+}: {
+  shotCount: number;
+  checkpoint: string;
+  outputQuality: string;
+  includeAudio: boolean;
+}) {
+  const shots = Math.max(1, shotCount);
+  const planning = 9;
+  const keyframes = shots * 2;
+  const render = shots * estimateRenderSeconds({ checkpoint, outputQuality });
+  const audio = includeAudio ? shots * 3 : 0;
+  const exportTime = 10 + shots;
+  return planning + keyframes + render + audio + exportTime;
+}
+
+function getProductionProgressSnapshot(progress: ProductionProgress, nowMs: number) {
+  if (!progress.active && !progress.completed) {
+    return {
+      percent: 0,
+      label: "대기 중",
+      elapsedSec: 0,
+      remainingSec: progress.totalEstimateSec,
+      totalEstimateSec: progress.totalEstimateSec,
+      active: false,
+      completed: false,
+    };
+  }
+  const elapsedSec = Math.max(0, (nowMs - progress.startedAt) / 1000);
+  const taskElapsedSec = Math.max(0, (nowMs - progress.taskStartedAt) / 1000);
+  const taskRatio = progress.completed ? 1 : Math.min(0.96, taskElapsedSec / Math.max(progress.taskEstimateSec, 1));
+  const rawPercent = progress.completed ? 100 : progress.basePercent + progress.segmentPercent * taskRatio;
+  const percent = Math.max(0, Math.min(100, Math.floor(rawPercent)));
+  const progressRatio = Math.max(percent / 100, elapsedSec / Math.max(progress.totalEstimateSec, 1) * 0.15);
+  const projectedTotal = progress.completed ? elapsedSec : Math.max(progress.totalEstimateSec, elapsedSec / Math.max(progressRatio, 0.01));
+  const remainingSec = progress.completed ? 0 : Math.max(0, projectedTotal - elapsedSec);
+  return {
+    percent,
+    label: progress.label,
+    elapsedSec,
+    remainingSec,
+    totalEstimateSec: projectedTotal,
+    active: progress.active,
+    completed: progress.completed,
+  };
 }
 
 function Inspector({ title, data }: { title: string; data: unknown }) {
