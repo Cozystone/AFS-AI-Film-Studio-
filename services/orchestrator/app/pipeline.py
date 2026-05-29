@@ -460,7 +460,20 @@ def render_comfy_ltx_shot(
         "high": 2.92,
         "ultra": 2.92,
     }
-    source_seconds = min(shot.duration, source_limits.get(preset.lower(), 1.75))
+    speed_floor = {
+        "turbo": 0.5,
+        "fast": 0.75,
+        "draft": 0.65,
+        "preview": 0.8,
+        "balanced": 1.0,
+        "high": 1.0,
+        "ultra": 1.0,
+    }
+    preset_key = preset.lower()
+    source_seconds = min(
+        shot.duration,
+        max(source_limits.get(preset_key, 1.75), shot.duration * speed_floor.get(preset_key, 0.8)),
+    )
     prompt = (
         f"{shot.visual_action}. {shot.purpose}. "
         f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "
@@ -537,7 +550,7 @@ def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "Mo
                 "-i",
                 str(concat_list),
                 "-vf",
-                "scale=1280:720:flags=lanczos:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,unsharp=5:5:0.8:3:3:0.3",
+                "scale=1280:720:flags=lanczos:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,eq=contrast=1.04:saturation=1.03,unsharp=5:5:0.95:3:3:0.35",
                 "-c:v",
                 "libx264",
                 "-preset",

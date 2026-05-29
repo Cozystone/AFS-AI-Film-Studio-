@@ -299,6 +299,7 @@ export default function Home() {
   const [selectedGalleryItem, setSelectedGalleryItem] = useState<GalleryItem | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [progressClock, setProgressClock] = useState(0);
+  const [smoothProgressPercent, setSmoothProgressPercent] = useState(0);
   const [productionProgress, setProductionProgress] = useState<ProductionProgress>({
     active: false,
     completed: false,
@@ -315,6 +316,7 @@ export default function Home() {
   const finalGallery = gallery.filter(isFinalGalleryItem);
   const timelineItems = getTimelineItems(gallery, project?.project_id ?? null);
   const progressSnapshot = getProductionProgressSnapshot(productionProgress, progressClock);
+  const displayProgressSnapshot = { ...progressSnapshot, percent: smoothProgressPercent };
 
   const request = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -414,6 +416,22 @@ export default function Home() {
     return () => window.clearInterval(interval);
   }, [productionProgress.active]);
 
+  useEffect(() => {
+    const target = progressSnapshot.percent;
+    if (target === 0) {
+      const timeout = window.setTimeout(() => setSmoothProgressPercent(0), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const interval = window.setInterval(() => {
+      setSmoothProgressPercent((current) => {
+        if (current === target) return current;
+        if (target < current) return current;
+        return Math.min(target, current + 1);
+      });
+    }, 90);
+    return () => window.clearInterval(interval);
+  }, [progressSnapshot.percent]);
+
   function saveOrchestratorUrl() {
     const normalized = orchestratorInput.trim().replace(/\/$/, "");
     setOrchestratorUrl(normalized);
@@ -426,6 +444,7 @@ export default function Home() {
     setMoviePreviewUrl(null);
     setGraph(null);
     setProject(null);
+    setSmoothProgressPercent(0);
     const startedAt = Date.now();
     let totalEstimateSec = estimateMovieSeconds({
       shotCount: storyboardScenes,
@@ -594,7 +613,7 @@ function selectFinalOutput(item: GalleryItem) {
                   className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-3 text-slate-100 outline-none focus:border-emerald-400"
                 />
               </label>
-              <MovieProductionProgress snapshot={progressSnapshot} />
+              <MovieProductionProgress snapshot={displayProgressSnapshot} />
               <button
                 className="mt-1 flex h-13 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-base font-semibold text-slate-950 disabled:opacity-60"
                 disabled={busy}
@@ -629,7 +648,7 @@ function selectFinalOutput(item: GalleryItem) {
                 </div>
               )}
             </div>
-            <ShotTimeline items={timelineItems} graph={graph} snapshot={progressSnapshot} t={t} orchestratorUrl={orchestratorUrl} />
+            <ShotTimeline items={timelineItems} graph={graph} snapshot={displayProgressSnapshot} t={t} orchestratorUrl={orchestratorUrl} />
             <RenderSettingsPanel
               styleHint={styleHint}
               setStyleHint={setStyleHint}
