@@ -155,6 +155,9 @@ const copy = {
     results: "결과물",
     latestOutputs: "생성된 영상",
     noOutputs: "아직 생성된 결과물이 없습니다.",
+    noFinalOutputs: "아직 통합 영상이 없습니다.",
+    editTimeline: "편집 타임라인",
+    editTimelineHint: "생성된 샷 조각은 여기에서 순서대로 확인합니다.",
     open: "열기",
     finalMovie: "최종 영화",
     shotPreview: "샷 프리뷰",
@@ -212,6 +215,9 @@ const copy = {
     results: "Results",
     latestOutputs: "Generated videos",
     noOutputs: "No generated outputs yet.",
+    noFinalOutputs: "No stitched movies yet.",
+    editTimeline: "Edit timeline",
+    editTimelineHint: "Generated shot fragments stay here in sequence.",
     open: "Open",
     finalMovie: "Final movie",
     shotPreview: "Shot preview",
@@ -251,6 +257,8 @@ export default function Home() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const latestJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
+  const finalGallery = gallery.filter(isFinalGalleryItem);
+  const timelineItems = getTimelineItems(gallery, project?.project_id ?? null);
 
   const request = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -533,6 +541,7 @@ export default function Home() {
                 </div>
               )}
             </div>
+            <ShotTimeline items={timelineItems} t={t} orchestratorUrl={orchestratorUrl} />
           </Panel>
 
           <Panel title={t.pcStatus} icon={<Gauge size={18} className="text-rose-300" />}>
@@ -542,7 +551,8 @@ export default function Home() {
 
         <aside className="xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
           <ResultsRail
-            items={gallery}
+            items={finalGallery}
+            allItems={gallery}
             t={t}
             orchestratorUrl={orchestratorUrl}
             selectedId={selectedGalleryItem?.artifact_id ?? null}
@@ -613,6 +623,7 @@ export default function Home() {
 
 function ResultsRail({
   items,
+  allItems,
   t,
   orchestratorUrl,
   selectedId,
@@ -622,6 +633,7 @@ function ResultsRail({
   stitchingProjectId,
 }: {
   items: GalleryItem[];
+  allItems: GalleryItem[];
   t: Record<string, string>;
   orchestratorUrl: string;
   selectedId: string | null;
@@ -630,7 +642,7 @@ function ResultsRail({
   onBuildPreview: (projectId: string) => void;
   stitchingProjectId: string | null;
 }) {
-  const stitchCandidate = findStitchCandidate(items);
+  const stitchCandidate = findStitchCandidate(allItems);
 
   return (
     <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
@@ -639,7 +651,7 @@ function ResultsRail({
           <Film size={18} className="text-emerald-300" />
           <div>
             <h2 className="font-semibold text-slate-100">{t.results}</h2>
-            <p className="text-xs text-slate-500">{items.length} {t.latestOutputs}</p>
+            <p className="text-xs text-slate-500">{items.length} {t.finalMovie}</p>
           </div>
         </div>
         <button
@@ -668,7 +680,7 @@ function ResultsRail({
           </button>
         </div>
       ) : null}
-      {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
+      {items.length === 0 ? <EmptyState text={t.noFinalOutputs} /> : null}
       <div className="space-y-3">
         {items.map((item) => (
           <GalleryCard
@@ -729,6 +741,34 @@ function GalleryCard({
   );
 }
 
+function ShotTimeline({ items, t, orchestratorUrl }: { items: GalleryItem[]; t: Record<string, string>; orchestratorUrl: string }) {
+  return (
+    <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-100">{t.editTimeline}</h3>
+          <p className="text-xs text-slate-500">{t.editTimelineHint}</p>
+        </div>
+        <span className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-400">{items.length}</span>
+      </div>
+      {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
+      {items.length > 0 ? (
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {items.map((item, index) => (
+            <article key={`${item.project_id}-${item.artifact_id}-${item.label}`} className="w-48 shrink-0 rounded-md border border-slate-800 bg-[#11151b] p-2">
+              <video className="aspect-video w-full rounded border border-slate-800 bg-black object-cover" src={`${orchestratorUrl}${item.media_url}`} muted preload="metadata" />
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="font-mono text-xs text-emerald-300">{String(index + 1).padStart(2, "0")}</span>
+                <span className="truncate text-xs text-slate-400">{item.label}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function findStitchCandidate(items: GalleryItem[]) {
   const projectIds = Array.from(new Set(items.map((item) => item.project_id)));
   for (const projectId of projectIds) {
@@ -740,6 +780,18 @@ function findStitchCandidate(items: GalleryItem[]) {
     }
   }
   return null;
+}
+
+function isFinalGalleryItem(item: GalleryItem) {
+  return item.type === "final_movie" || item.type === "video_project";
+}
+
+function getTimelineItems(items: GalleryItem[], currentProjectId: string | null) {
+  const shots = items.filter((item) => item.type === "video_shot");
+  const preferredProjectId = currentProjectId ?? shots[0]?.project_id ?? null;
+  return shots
+    .filter((item) => !preferredProjectId || item.project_id === preferredProjectId)
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function AlbumView({
