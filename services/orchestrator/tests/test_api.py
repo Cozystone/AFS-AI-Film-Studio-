@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.pipeline import _ffmpeg_available
 from app.main import app
 
 
@@ -54,6 +55,9 @@ def test_project_plan_render_repair_flow() -> None:
     exported = client.post(f"/api/projects/{project_id}/export", json={"format": "mp4", "resolution": "1280x720", "include_audio": True})
     assert exported.status_code == 200
     assert exported.json()["artifact"]["type"] == "video_project"
+    if _ffmpeg_available():
+        assert exported.json()["artifact"]["input_context"]["include_audio"] is True
+        assert exported.json()["artifact"]["input_context"]["audio_mix_path"]
     project_preview = client.get(f"/api/projects/{project_id}/preview")
     assert project_preview.status_code == 200
     assert project_preview.json()["artifact"]["type"] == "video_project"

@@ -113,7 +113,7 @@ def _run_project_render_job(job_id: str, project_id: str, payload: RenderRequest
 
         export_dir = store.project_dir(project_id) / "exports"
         export_dir.mkdir(parents=True, exist_ok=True)
-        artifact = stitch_project_movie(store, project_id)
+        artifact = stitch_project_movie(store, project_id, include_audio=payload.audio)
         sidecar_path = export_dir / "final_1280p720.json"
         store.write_json(
             sidecar_path,
@@ -428,7 +428,7 @@ def export_project(project_id: str, payload: ExportRequest) -> dict:
     update_job_progress(store, job, 0.25)
     export_dir = store.project_dir(project_id) / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
-    artifact = stitch_project_movie(store, project_id)
+    artifact = stitch_project_movie(store, project_id, include_audio=payload.include_audio)
     update_job_progress(store, job, 0.85)
     path = export_dir / f"final_{payload.resolution.replace('x', 'p')}.{payload.format}"
     sidecar = {

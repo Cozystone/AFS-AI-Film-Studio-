@@ -692,15 +692,113 @@ def render_comfy_ltx_shot(
     return artifact
 
 
-def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "MockRenderer") -> ArtifactMetadata:
+def _mix_shot_audio(project_dir: Path, shot: Shot, export_dir: Path) -> Path | None:
+    if not _ffmpeg_available():
+        return None
+    audio_dir = project_dir / "shots" / shot.shot_id / "audio"
+    layer_paths = [audio_dir / f"{layer}.wav" for layer in ("ambience", "foley", "music", "dialogue")]
+    available_layers = [path for path in layer_paths if path.exists()]
+    output_path = export_dir / f"{shot.shot_id}.mix.wav"
+    duration = max(0.25, float(shot.duration))
+
+    if not available_layers:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                f"anullsrc=channel_layout=stereo:sample_rate=48000:d={duration:.3f}",
+                "-t",
+                f"{duration:.3f}",
+                "-c:a",
+                "pcm_s16le",
+                str(output_path),
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return output_path if result.returncode == 0 and output_path.exists() else None
+
+    command = ["ffmpeg", "-y"]
+    for path in available_layers:
+        command += ["-i", str(path)]
+
+    parts: list[str] = []
+    for index, path in enumerate(available_layers):
+        volume = {"ambience": 0.24, "foley": 0.28, "music": 0.18, "dialogue": 0.6}.get(path.stem, 0.22)
+        parts.append(
+            f"[{index}:a]aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo,"
+            f"volume={volume},apad,atrim=0:{duration:.3f},asetpts=N/SR/TB[a{index}]"
+        )
+    inputs = "".join(f"[a{index}]" for index in range(len(available_layers)))
+    filter_complex = ";".join(parts) + f";{inputs}amix=inputs={len(available_layers)}:duration=longest:normalize=0,atrim=0:{duration:.3f},alimiter=limit=0.82[out]"
+
+    result = subprocess.run(
+        command
+        + [
+            "-filter_complex",
+            filter_complex,
+            "-map",
+            "[out]",
+            "-c:a",
+            "pcm_s16le",
+            str(output_path),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return output_path if result.returncode == 0 and output_path.exists() else None
+
+
+def _build_project_audio(project_dir: Path, graph: CineGraph, export_dir: Path) -> Path | None:
+    if not _ffmpeg_available() or not graph.shots:
+        return None
+    shot_audio_paths = [_mix_shot_audio(project_dir, shot, export_dir) for shot in graph.shots]
+    available_audio = [path for path in shot_audio_paths if path and path.exists()]
+    if not available_audio:
+        return None
+    concat_list = export_dir / "audio.txt"
+    concat_list.write_text(
+        "".join(f"file '{path.resolve().as_posix()}'\n" for path in available_audio),
+        encoding="utf-8",
+    )
+    final_audio = export_dir / "final_audio.wav"
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(concat_list),
+            "-c:a",
+            "pcm_s16le",
+            str(final_audio),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return final_audio if result.returncode == 0 and final_audio.exists() else None
+
+
+def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "MockRenderer", include_audio: bool = True) -> ArtifactMetadata:
     project_dir = store.project_dir(project_id)
     project = store.get_project(project_id)
     graph = CineGraph.model_validate(store.read_json(project_dir / "cinegraph.json"))
     export_dir = project_dir / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     video_path = export_dir / "final_1280p720.mp4"
+    silent_video_path = export_dir / "final_1280p720.video.mp4"
     shot_paths = [project_dir / "shots" / shot.shot_id / "final" / "shot.mp4" for shot in graph.shots]
     available_shots = [path for path in shot_paths if path.exists()]
+    audio_mix_path = _build_project_audio(project_dir, graph, export_dir) if include_audio else None
 
     if _ffmpeg_available() and available_shots:
         concat_list = export_dir / "shots.txt"
@@ -730,13 +828,14 @@ def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "Mo
                 "yuv420p",
                 "-movflags",
                 "+faststart",
-                str(video_path),
+                str(silent_video_path if audio_mix_path else video_path),
             ],
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        if result.returncode != 0 or not video_path.exists():
+        rendered_video_path = silent_video_path if audio_mix_path else video_path
+        if result.returncode != 0 or not rendered_video_path.exists():
             fallback = subprocess.run(
                 [
                     "ffmpeg",
@@ -751,15 +850,46 @@ def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "Mo
                     "copy",
                     "-pix_fmt",
                     "yuv420p",
+                    str(rendered_video_path),
+                ],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if fallback.returncode != 0 or not rendered_video_path.exists():
+                video_path = export_dir / "final.ffmpeg_failed.txt"
+                video_path.write_text("ffmpeg failed; project movie metadata only\n", encoding="utf-8")
+        if isinstance(video_path, Path) and audio_mix_path and rendered_video_path.exists():
+            mux_result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(rendered_video_path),
+                    "-i",
+                    str(audio_mix_path),
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "1:a:0",
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "192k",
+                    "-shortest",
+                    "-movflags",
+                    "+faststart",
                     str(video_path),
                 ],
                 check=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            if fallback.returncode != 0 or not video_path.exists():
-                video_path = export_dir / "final.ffmpeg_failed.txt"
-                video_path.write_text("ffmpeg failed; project movie metadata only\n", encoding="utf-8")
+            if mux_result.returncode != 0 or not video_path.exists():
+                shutil.copy2(rendered_video_path, video_path)
+                audio_mix_path = None
     else:
         video_path = export_dir / "final.ffmpeg_missing.txt"
         video_path.write_text("ffmpeg not found or no shot media; project movie metadata only\n", encoding="utf-8")
@@ -773,6 +903,8 @@ def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "Mo
             "shot_count": len(graph.shots),
             "available_shot_count": len(available_shots),
             "shot_paths": [str(path) for path in shot_paths],
+            "include_audio": include_audio,
+            "audio_mix_path": str(audio_mix_path) if audio_mix_path else None,
             "upscale": {
                 "method": "final_only_ffmpeg_lanczos",
                 "resolution": "1280x720",
