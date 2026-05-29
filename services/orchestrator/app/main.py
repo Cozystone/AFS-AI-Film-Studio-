@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,7 @@ from .schemas import (
     CineGraph,
     ExportRequest,
     Job,
+    JobStatus,
     JobType,
     KeyframeGenerateRequest,
     Project,
@@ -30,6 +32,7 @@ from .schemas import (
     ProjectStyle,
     RenderRequest,
     RepairRequest,
+    now_iso,
 )
 from .storage import LocalStore
 from .system_usage import system_usage
@@ -43,6 +46,84 @@ app.add_middleware(
     allow_headers=["*"],
 )
 store = LocalStore()
+
+
+def _fail_job(job: Job, error: Exception) -> None:
+    job.status = JobStatus.failed
+    job.error = str(error)
+    job.ended_at = now_iso()
+    store.save_job(job)
+
+
+def _render_mock_shot(project_id: str, graph: CineGraph, shot_id: str, renderer: str):
+    artifacts = []
+    shot_chunks = [chunk for chunk in graph.chunks if chunk.shot_id == shot_id]
+    for chunk in shot_chunks:
+        artifact, _ = render_mock_chunk(store, project_id, chunk.chunk_id, renderer)
+        artifacts.append(artifact)
+    return stitch_mock_shot(store, project_id, shot_id, artifacts, renderer)
+
+
+def _run_project_render_job(job_id: str, project_id: str, payload: RenderRequest) -> None:
+    job = store.get_job(job_id)
+    try:
+        project = store.get_project(project_id)
+        graph_path = store.project_dir(project_id) / "cinegraph.json"
+        if not graph_path.exists():
+            raise FileNotFoundError("cinegraph.json not found; run project planning first")
+        graph = CineGraph.model_validate(store.read_json(graph_path))
+        shots = graph.shots
+        total_shots = max(len(shots), 1)
+        renderer = "mock" if payload.renderer.lower() == "mock" else payload.renderer
+        model_renderer = renderer.lower()
+
+        job.estimated_duration_sec = max(
+            20.0,
+            total_shots * (2.0 if model_renderer == "mock" else 140.0) + (total_shots * 3.0 if payload.audio else 0.0) + 12.0,
+        )
+        store.save_job(job)
+        update_job_progress(store, job, 0.02)
+
+        for index, shot in enumerate(shots, start=1):
+            write_placeholder_keyframes(store, project_id, shot.shot_id, ["first", "middle", "last"])
+            update_job_progress(store, job, 0.05 + 0.10 * (index / total_shots))
+
+        for index, shot in enumerate(shots, start=1):
+            if model_renderer in {"comfy", "comfy_ltx", "ltx", "ltxrenderer"}:
+                render_comfy_ltx_shot(store, project_id, shot.shot_id, renderer)
+            else:
+                _render_mock_shot(project_id, graph, shot.shot_id, renderer)
+            update_job_progress(store, job, 0.15 + 0.70 * (index / total_shots))
+
+        if payload.audio:
+            for index, shot in enumerate(shots, start=1):
+                render_mock_audio(store, project_id, shot.shot_id, ["foley", "ambience", "music"])
+                update_job_progress(store, job, 0.85 + 0.10 * (index / total_shots))
+        else:
+            update_job_progress(store, job, 0.95)
+
+        export_dir = store.project_dir(project_id) / "exports"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        artifact = stitch_project_movie(store, project_id)
+        sidecar_path = export_dir / "final_1280p720.json"
+        store.write_json(
+            sidecar_path,
+            {
+                "project_id": project.project_id,
+                "title": project.title,
+                "format": "mp4",
+                "resolution": "1280x720",
+                "include_audio": payload.audio,
+                "status": "async_export_ready",
+                "artifact_id": artifact.artifact_id,
+                "media_url": f"/api/projects/{project.project_id}/artifacts/{artifact.artifact_id}/media"
+                if artifact.path.endswith(".mp4")
+                else None,
+            },
+        )
+        complete_job(store, job, [artifact.path, str(sidecar_path)])
+    except Exception as exc:
+        _fail_job(job, exc)
 
 
 @app.get("/health")
@@ -98,6 +179,19 @@ def generate_plan(project_id: str) -> CineGraph:
     store.write_json(project_dir / "render_plan.json", {"render_plans": [plan.model_dump(mode="json") for plan in graph.render_plans]})
     complete_job(store, job, [str(project_dir / "cinegraph.json")])
     return graph
+
+
+@app.post("/api/projects/{project_id}/render_async")
+def render_project_async(project_id: str, payload: RenderRequest) -> dict:
+    store.get_project(project_id)
+    graph_path = store.project_dir(project_id) / "cinegraph.json"
+    if not graph_path.exists():
+        raise HTTPException(status_code=409, detail="project must be planned before rendering")
+    job = create_job(store, JobType.EXPORT_PROJECT, project_id, project_id)
+    update_job_progress(store, job, 0.01)
+    thread = threading.Thread(target=_run_project_render_job, args=(job.job_id, project_id, payload), daemon=True)
+    thread.start()
+    return {"job_id": job.job_id, "status": job.status.value}
 
 
 def _find_project_for_shot(shot_id: str) -> tuple[str, CineGraph]:

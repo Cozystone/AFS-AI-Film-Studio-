@@ -84,6 +84,7 @@ type Job = {
   estimated_duration_sec: number | null;
   elapsed_sec: number;
   remaining_sec: number | null;
+  error: string | null;
 };
 
 type GalleryItem = {
@@ -474,6 +475,48 @@ export default function Home() {
         outputQuality,
         includeAudio,
       });
+
+      setStatus(t.rendering);
+      setMovieTask("백그라운드 영화 제작 시작", 7, 88, totalEstimateSec);
+      const queued = await request<{ job_id: string; status: string }>(`/api/projects/${created.project_id}/render_async`, {
+        method: "POST",
+        body: JSON.stringify({
+          preset: outputQuality,
+          renderer: checkpoint === "mock" ? "mock" : "comfy_ltx",
+          audio: includeAudio,
+          checkpoint,
+          lora,
+          text_encoder: textEncoder,
+          seed: seed.trim() || null,
+        }),
+      });
+      await waitForMovieRender({
+        jobId: queued.job_id,
+        projectId: created.project_id,
+        startedAt,
+        totalEstimateSec,
+        request,
+        loadGallery,
+        setMoviePreviewUrl,
+        setProductionProgress,
+        setProgressClock,
+        orchestratorUrl,
+      });
+      await loadGallery();
+      setStatus(t.complete);
+      setProductionProgress({
+        active: false,
+        completed: true,
+        label: "완료",
+        basePercent: 100,
+        segmentPercent: 0,
+        taskStartedAt: Date.now(),
+        taskEstimateSec: 1,
+        startedAt,
+        totalEstimateSec: Math.max(1, (Date.now() - startedAt) / 1000),
+      });
+      setProgressClock(Date.now());
+      return;
 
       setStatus(t.keyframing);
       const keyframeSegment = 8 / Math.max(planned.shots.length, 1);
@@ -1374,6 +1417,71 @@ function JobProgressItem({ job, t }: { job: Job; t: Record<string, string> }) {
       </div>
     </div>
   );
+}
+
+async function waitForMovieRender({
+  jobId,
+  projectId,
+  startedAt,
+  totalEstimateSec,
+  request,
+  loadGallery,
+  setMoviePreviewUrl,
+  setProductionProgress,
+  setProgressClock,
+  orchestratorUrl,
+}: {
+  jobId: string;
+  projectId: string;
+  startedAt: number;
+  totalEstimateSec: number;
+  request: <T>(path: string, init?: RequestInit) => Promise<T>;
+  loadGallery: () => Promise<void>;
+  setMoviePreviewUrl: (url: string | null) => void;
+  setProductionProgress: (progress: ProductionProgress) => void;
+  setProgressClock: (value: number) => void;
+  orchestratorUrl: string;
+}) {
+  while (true) {
+    const job = await request<Job>(`/api/jobs/${jobId}`);
+    const backendPercent = Math.max(7, Math.min(99, Math.round(job.progress * 100)));
+    const label = describeMovieJob(job);
+    setProductionProgress({
+      active: job.status !== "succeeded" && job.status !== "failed" && job.status !== "cancelled",
+      completed: job.status === "succeeded",
+      label,
+      basePercent: job.status === "succeeded" ? 100 : backendPercent,
+      segmentPercent: 0,
+      taskStartedAt: Date.now(),
+      taskEstimateSec: 1,
+      startedAt,
+      totalEstimateSec: job.estimated_duration_sec ?? totalEstimateSec,
+    });
+    setProgressClock(Date.now());
+    if (job.status === "succeeded") {
+      const preview = await request<{ media_url: string }>(`/api/projects/${projectId}/preview`);
+      setMoviePreviewUrl(`${orchestratorUrl}${preview.media_url}`);
+      await loadGallery();
+      return;
+    }
+    if (job.status === "failed" || job.status === "cancelled") {
+      throw new Error(job.error || `Render job ${job.status}`);
+    }
+    await sleep(2000);
+  }
+}
+
+function describeMovieJob(job: Job) {
+  const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
+  if (percent < 15) return "키프레임 준비";
+  if (percent < 85) return `영상 렌더링 ${percent}%`;
+  if (percent < 95) return "오디오 레이어 생성";
+  if (percent < 100) return "통합 영상 합성";
+  return "완료";
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function formatSeconds(value: number | null) {
