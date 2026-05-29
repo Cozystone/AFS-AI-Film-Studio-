@@ -315,7 +315,7 @@ export default function Home() {
 
   const latestJobs = useMemo(() => jobs.slice(0, 6), [jobs]);
   const finalGallery = gallery.filter(isFinalGalleryItem);
-  const timelineItems = getTimelineItems(gallery, project?.project_id ?? null);
+  const timelineItems = project ? getTimelineItems(gallery, project.project_id) : [];
   const progressSnapshot = getProductionProgressSnapshot(productionProgress, progressClock);
   const displayProgressSnapshot = { ...progressSnapshot, percent: smoothProgressPercent };
 
@@ -461,6 +461,7 @@ export default function Home() {
     setGraph(null);
     setMoviePreviewUrl(null);
     setSelectedGalleryItem(null);
+    setGallery([]);
     setStatus(t.ready);
     setSmoothProgressPercent(0);
     setProgressClock(0);
@@ -1219,7 +1220,7 @@ type TimelineClip = {
 function buildTimelineClips(graph: CineGraph | null, items: GalleryItem[], percent: number, plannedSceneCount: number): TimelineClip[] {
   const shotItems = items.filter((item) => item.type === "video_shot");
   if (!graph || graph.shots.length === 0) {
-    if (shotItems.length > 0) {
+    if (percent > 0 && shotItems.length > 0) {
       return shotItems.map((item) => ({
         id: item.artifact_id,
         label: item.label,
