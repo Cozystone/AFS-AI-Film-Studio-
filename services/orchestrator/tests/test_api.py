@@ -70,3 +70,25 @@ def test_system_usage_endpoint() -> None:
     assert "cpu" in payload
     assert "gpu" in payload
     assert "usage_percent" in payload["cpu"]
+
+
+def test_single_long_take_plan_respects_one_shot() -> None:
+    created = client.post(
+        "/api/projects",
+        json={
+            "title": "Long Take",
+            "script_prompt": "A ten second uninterrupted cinematic shot of a person crossing a quiet room.",
+            "duration": 10,
+            "aspect_ratio": "16:9",
+            "style_hint": "cinematic, source=single_long_take, shots=1, clip_seconds=10",
+            "audio_hint": "quiet room tone",
+        },
+    )
+    assert created.status_code == 200
+    project_id = created.json()["project_id"]
+
+    planned = client.post(f"/api/projects/{project_id}/plan")
+    assert planned.status_code == 200
+    graph = planned.json()
+    assert len(graph["shots"]) == 1
+    assert graph["shots"][0]["duration"] == 10

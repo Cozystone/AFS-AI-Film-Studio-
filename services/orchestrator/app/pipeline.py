@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import uuid
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -234,6 +235,13 @@ def complete_job(store: LocalStore, job: Job, outputs: list[str]) -> Job:
     return job
 
 
+def _extract_style_int(style: str, key: str) -> int | None:
+    match = re.search(rf"(?:^|,\s*){re.escape(key)}=(\d+)", style)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
 def mock_plan(project: Project) -> CineGraph:
     character = Character(
         character_id="person_a",
@@ -265,7 +273,14 @@ def mock_plan(project: Project) -> CineGraph:
         },
     )
 
-    shot_count = max(3, min(8, round(project.format.duration / 5)))
+    requested_shots = _extract_style_int(project.style.visual, "shots")
+    single_long_take = "source=single_long_take" in project.style.visual or "long_take" in project.style.visual
+    if requested_shots is not None:
+        shot_count = max(1, min(12, requested_shots))
+    elif single_long_take:
+        shot_count = 1
+    else:
+        shot_count = max(3, min(8, round(project.format.duration / 5)))
     shot_duration = round(project.format.duration / shot_count, 2)
     shots: list[Shot] = []
     chunks: list[Chunk] = []
@@ -788,6 +803,130 @@ def _build_project_audio(project_dir: Path, graph: CineGraph, export_dir: Path) 
     return final_audio if result.returncode == 0 and final_audio.exists() else None
 
 
+def _write_silence_audio(path: Path, duration: float) -> bool:
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"anullsrc=channel_layout=stereo:sample_rate=48000:d={duration:.3f}",
+            "-t",
+            f"{duration:.3f}",
+            "-c:a",
+            "pcm_s16le",
+            str(path),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0 and path.exists()
+
+
+def _wants_music(audio_hint: str) -> bool:
+    lowered = audio_hint.lower()
+    return any(term in lowered for term in ("music", "score", "bgm", "soundtrack", "음악", "브금", "스코어"))
+
+
+def _render_ambience_audio(path: Path, duration: float, audio_hint: str) -> bool:
+    if not audio_hint.strip():
+        return _write_silence_audio(path, duration)
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            (
+                f"anoisesrc=color=brown:duration={duration:.3f}:amplitude=0.018,"
+                "highpass=f=70,lowpass=f=1800,aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo,"
+                f"afade=t=in:st=0:d=0.25,afade=t=out:st={max(0.0, duration - 0.45):.3f}:d=0.45"
+            ),
+            "-t",
+            f"{duration:.3f}",
+            "-c:a",
+            "pcm_s16le",
+            str(path),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0 and path.exists()
+
+
+def _render_music_audio(path: Path, duration: float, audio_hint: str) -> bool:
+    if not _wants_music(audio_hint):
+        return _write_silence_audio(path, duration)
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            (
+                f"sine=frequency=73:duration={duration:.3f},volume=0.026,"
+                "aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo,"
+                f"afade=t=in:st=0:d=0.6,afade=t=out:st={max(0.0, duration - 0.8):.3f}:d=0.8"
+            ),
+            "-t",
+            f"{duration:.3f}",
+            "-c:a",
+            "pcm_s16le",
+            str(path),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0 and path.exists()
+
+
+def _render_foley_audio(path: Path, duration: float, events: list[AudioVisualEvent]) -> bool:
+    foley_events = [event for event in events if event.audio.get("type") == "foley"]
+    if not foley_events:
+        return _write_silence_audio(path, duration)
+
+    command = ["ffmpeg", "-y", "-f", "lavfi", "-i", f"anullsrc=channel_layout=stereo:sample_rate=48000:d={duration:.3f}"]
+    for index, _event in enumerate(foley_events, start=1):
+        frequency = 680 + (index % 3) * 170
+        command += ["-f", "lavfi", "-i", f"sine=frequency={frequency}:duration=0.085"]
+
+    parts = [f"[0:a]volume=0.0,atrim=0:{duration:.3f}[base]"]
+    for index, event in enumerate(foley_events, start=1):
+        delay_ms = max(0, int(float(event.time) * 1000))
+        volume = min(0.16, max(0.035, float(event.audio.get("volume", 0.35)) * 0.12))
+        parts.append(
+            f"[{index}:a]volume={volume:.3f},afade=t=out:st=0.015:d=0.07,"
+            f"adelay={delay_ms}:all=1,apad,atrim=0:{duration:.3f}[a{index}]"
+        )
+    inputs = "[base]" + "".join(f"[a{index}]" for index in range(1, len(foley_events) + 1))
+    filter_complex = ";".join(parts) + f";{inputs}amix=inputs={len(foley_events) + 1}:duration=first:normalize=0,alimiter=limit=0.55[out]"
+
+    result = subprocess.run(
+        command
+        + [
+            "-filter_complex",
+            filter_complex,
+            "-map",
+            "[out]",
+            "-t",
+            f"{duration:.3f}",
+            "-c:a",
+            "pcm_s16le",
+            str(path),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0 and path.exists()
+
+
 def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "MockRenderer", include_audio: bool = True) -> ArtifactMetadata:
     project_dir = store.project_dir(project_id)
     project = store.get_project(project_id)
@@ -920,19 +1059,28 @@ def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "Mo
 
 def render_mock_audio(store: LocalStore, project_id: str, shot_id: str, layers: list[str]) -> list[str]:
     project_dir = store.project_dir(project_id)
+    project = store.get_project(project_id)
+    graph = CineGraph.model_validate(store.read_json(project_dir / "cinegraph.json"))
+    shot = next((candidate for candidate in graph.shots if candidate.shot_id == shot_id), None)
+    duration = max(0.25, float(shot.duration if shot else 2.0))
+    events = [event for event in graph.audio_visual_events if event.shot_id == shot_id]
     audio_dir = project_dir / "shots" / shot_id / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[str] = []
     for layer in layers:
         path = audio_dir / f"{layer}.wav"
         if _ffmpeg_available():
-            freq = {"dialogue": 220, "foley": 440, "ambience": 110, "music": 330}.get(layer, 220)
-            subprocess.run(
-                ["ffmpeg", "-y", "-f", "lavfi", "-i", f"sine=frequency={freq}:duration=2", str(path)],
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            rendered = False
+            if layer == "ambience":
+                rendered = _render_ambience_audio(path, duration, project.style.audio)
+            elif layer == "foley":
+                rendered = _render_foley_audio(path, duration, events)
+            elif layer == "music":
+                rendered = _render_music_audio(path, duration, project.style.audio)
+            elif layer == "dialogue":
+                rendered = _write_silence_audio(path, duration)
+            if not rendered:
+                _write_silence_audio(path, duration)
         else:
             path = audio_dir / f"{layer}.ffmpeg_missing.txt"
             path.write_text("ffmpeg not found; mock audio metadata only\n", encoding="utf-8")
@@ -941,6 +1089,12 @@ def render_mock_audio(store: LocalStore, project_id: str, shot_id: str, layers: 
             type="audio_layer",
             path=str(path),
             renderer="MockAudioRenderer",
+            input_context={
+                "layer": layer,
+                "duration": duration,
+                "policy": "procedural story-safe audio; dialogue stays silent unless a real dialogue adapter is attached",
+                "events": [event.model_dump(mode="json") for event in events if event.audio.get("type") == layer],
+            },
             outputs={"audio": str(path)},
         )
         store.write_json(audio_dir / f"{layer}.json", metadata)

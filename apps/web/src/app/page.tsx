@@ -444,6 +444,14 @@ export default function Home() {
     else window.localStorage.removeItem("afs.orchestratorUrl");
   }
 
+  function updateMovieSource(value: string) {
+    setMovieSource(value);
+    if (value === "single_long_take") {
+      setStoryboardScenes(1);
+      setClipLength(10);
+    }
+  }
+
   function resetWorkspace() {
     setTitle("");
     setScriptPrompt("");
@@ -520,7 +528,7 @@ export default function Home() {
           script_prompt: scriptPrompt.trim(),
           duration: storyboardScenes * clipLength,
           aspect_ratio: aspectRatio,
-          style_hint: `${styleHint}, ${renderStyle}, ${outputQuality}, source=${movieSource}, continuity=${keepContinuity}`,
+          style_hint: `${styleHint}, ${renderStyle}, ${outputQuality}, source=${movieSource}, shots=${storyboardScenes}, clip_seconds=${clipLength}, continuity=${keepContinuity}`,
           audio_hint: audioHint,
         }),
       });
@@ -708,7 +716,7 @@ function selectFinalOutput(item: GalleryItem) {
               audioHint={audioHint}
               setAudioHint={setAudioHint}
               movieSource={movieSource}
-              setMovieSource={setMovieSource}
+              setMovieSource={updateMovieSource}
               storyboardScenes={storyboardScenes}
               setStoryboardScenes={setStoryboardScenes}
               checkpoint={checkpoint}
@@ -955,11 +963,12 @@ function RenderSettingsPanel({
         <div className="grid gap-3 md:grid-cols-2">
           <SelectField label="Movie source" value={movieSource} onChange={setMovieSource}>
             <option value="auto_storyboard">Auto storyboard images</option>
+            <option value="single_long_take">Single long take</option>
             <option value="text_only">Text only</option>
             <option value="reference_locked">Reference locked</option>
           </SelectField>
           <SelectField label="Storyboard scenes" value={String(storyboardScenes)} onChange={(value) => setStoryboardScenes(Number(value))}>
-            {[3, 4, 5, 6, 8, 10].map((count) => (
+            {[1, 3, 4, 5, 6, 8, 10].map((count) => (
               <option key={count} value={count}>
                 {count} scenes
               </option>
@@ -1003,6 +1012,7 @@ function RenderSettingsPanel({
             <option value="3">3 seconds</option>
             <option value="5">5 seconds</option>
             <option value="8">8 seconds</option>
+            <option value="10">10 seconds</option>
           </SelectField>
           <SelectField label="Style" value={renderStyle} onChange={setRenderStyle}>
             <option value="cinematic">Cinematic</option>
