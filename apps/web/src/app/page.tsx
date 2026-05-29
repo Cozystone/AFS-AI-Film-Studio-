@@ -531,9 +531,11 @@ export default function Home() {
           <Panel title={t.previewTitle} description={t.previewBody} icon={<MonitorPlay size={18} className="text-amber-300" />}>
             <div className="overflow-hidden rounded-md border border-slate-800 bg-black shadow-2xl shadow-black/30">
               {moviePreviewUrl ? (
-                <video controls className="aspect-video min-h-[520px] w-full bg-black object-contain" src={moviePreviewUrl} />
+                <div className="aspect-video w-full">
+                  <video controls className="h-full w-full bg-black object-contain" src={moviePreviewUrl} />
+                </div>
               ) : (
-                <div className="grid aspect-video min-h-[520px] place-items-center p-6 text-center text-sm text-slate-500">
+                <div className="grid aspect-video w-full place-items-center p-6 text-center text-sm text-slate-500">
                   <div>
                     <MonitorPlay className="mx-auto mb-3 text-slate-700" size={44} />
                     {t.noPreview}
@@ -667,7 +669,7 @@ function ResultsRail({
         <div className="mb-3 rounded-md border border-emerald-500/30 bg-emerald-950/20 p-3">
           <p className="truncate text-sm font-medium text-slate-100">{stitchCandidate.title}</p>
           <p className="mt-1 text-xs text-slate-400">
-            {stitchCandidate.shotCount} {t.shotPreview} · {t.partialPreviewHint}
+            {stitchCandidate.shotCount} {t.shotPreview} / {t.partialPreviewHint}
           </p>
           <button
             className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-3 text-sm font-semibold text-slate-950 disabled:opacity-60"
@@ -722,7 +724,7 @@ function GalleryCard({
         <div className="mb-2 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-100">{item.project_title}</p>
-            <p className="mt-0.5 truncate text-xs text-slate-500">{isFinal ? t.finalMovie : `${t.shotPreview} · ${item.label}`}</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">{isFinal ? t.finalMovie : `${t.shotPreview} / ${item.label}`}</p>
           </div>
           <span className={isFinal ? "rounded border border-emerald-500/50 px-2 py-1 text-xs text-emerald-300" : "rounded border border-slate-700 px-2 py-1 text-xs text-slate-300"}>
             {isFinal ? "FINAL" : "SHOT"}
@@ -826,11 +828,13 @@ function AlbumView({
           </button>
         </div>
         <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
-          <div className="min-h-0 overflow-hidden rounded-md border border-slate-800 bg-black">
+          <div className="grid min-h-0 place-items-center overflow-hidden rounded-md border border-slate-800 bg-black">
             {active ? (
-              <video controls className="h-full max-h-[calc(100vh-9rem)] w-full bg-black object-contain" src={`${orchestratorUrl}${active.media_url}`} />
+              <div className="aspect-video w-full max-w-full">
+                <video controls className="h-full w-full bg-black object-contain" src={`${orchestratorUrl}${active.media_url}`} />
+              </div>
             ) : (
-              <div className="grid h-full min-h-[420px] place-items-center text-sm text-slate-500">{t.noOutputs}</div>
+              <div className="grid aspect-video w-full place-items-center text-sm text-slate-500">{t.noOutputs}</div>
             )}
           </div>
           <div className="min-h-0 overflow-y-auto">

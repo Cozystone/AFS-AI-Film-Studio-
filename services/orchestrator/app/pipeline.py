@@ -569,7 +569,12 @@ def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "Mo
             "shot_count": len(graph.shots),
             "available_shot_count": len(available_shots),
             "shot_paths": [str(path) for path in shot_paths],
-            "upscale": {"method": "ffmpeg_lanczos", "resolution": "1280x720", "crf": 18},
+            "upscale": {
+                "method": "final_only_ffmpeg_lanczos",
+                "resolution": "1280x720",
+                "crf": 18,
+                "policy": "upscale only the stitched preview to avoid per-shot render cost explosion",
+            },
         },
         outputs={"video": str(video_path)},
     )
