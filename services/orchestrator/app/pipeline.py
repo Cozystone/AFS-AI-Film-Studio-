@@ -35,7 +35,7 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
 
-CONTACT_TERMS = (
+PRECISION_TERMS = (
     "knife",
     "knives",
     "blade",
@@ -43,31 +43,92 @@ CONTACT_TERMS = (
     "sword",
     "swords",
     "dagger",
+    "weapon",
     "clash",
     "strike",
     "sparks",
     "contact",
+    "touch",
+    "grab",
+    "hold",
+    "hand",
+    "hands",
+    "finger",
+    "fingers",
+    "face",
+    "eyes",
+    "mouth",
+    "product",
+    "logo",
+    "text",
+    "letters",
+    "glass",
+    "liquid",
+    "wire",
+    "rope",
+    "key",
+    "phone",
+    "camera",
+    "close-up",
+    "closeup",
+    "macro",
+    "detail",
     "칼",
     "검",
     "날",
+    "무기",
     "부딪",
     "맞닿",
     "충돌",
+    "접촉",
+    "쥐다",
+    "잡다",
+    "손",
+    "손가락",
+    "얼굴",
+    "눈",
+    "입",
+    "제품",
+    "로고",
+    "글자",
+    "유리",
+    "액체",
+    "전선",
+    "줄",
+    "열쇠",
+    "휴대폰",
+    "카메라",
+    "클로즈업",
+    "디테일",
     "스파크",
 )
 
+BLADE_TERMS = ("knife", "knives", "blade", "blades", "sword", "swords", "dagger", "칼", "검", "날")
 
-def _contains_contact_action(text: str) -> bool:
+
+def _requires_precision_render(text: str) -> bool:
     lowered = text.lower()
-    return any(term in lowered for term in CONTACT_TERMS)
+    return any(term in lowered for term in PRECISION_TERMS)
+
+
+def _contains_blade_action(text: str) -> bool:
+    lowered = text.lower()
+    return any(term in lowered for term in BLADE_TERMS)
 
 
 def _hero_prop_for_script(script: str) -> Prop:
-    if _contains_contact_action(script):
+    if _contains_blade_action(script):
         return Prop(
             prop_id="hero_blade",
             name="Hero Blade",
             description="a consistent sharp metal blade with a clean silhouette, visible edge, stable handle, and clear contact point",
+            importance="high",
+        )
+    if _requires_precision_render(script):
+        return Prop(
+            prop_id="hero_detail_prop",
+            name="Hero Detail Prop",
+            description="a recurring high-detail object with crisp edges, stable silhouette, and no warped or melted surfaces",
             importance="high",
         )
     return Prop(
@@ -102,13 +163,18 @@ def _continuity_bible(project: Project, graph: CineGraph | None = None) -> str:
     )
 
 
-def _contact_detail_prompt(text: str) -> str:
-    if not _contains_contact_action(text):
+def _precision_detail_prompt(text: str) -> str:
+    if not _requires_precision_render(text):
         return ""
-    return (
-        "CONTACT-CRITICAL ACTION. Keep the blade or striking object crisp and physically separate. "
-        "Show the exact contact point clearly, with two distinct hard edges, stable hands, and no melted metal, no fused objects, no smeared impact."
+    detail = (
+        "HIGH-PRECISION ACTION. Preserve crisp edges, stable hands, faces, object boundaries, contact points, product details, logos, and readable text. "
+        "No melted objects, no fused hands, no smeared edges, no warped faces, no mushy contact, no illegible text."
     )
+    if _contains_blade_action(text):
+        detail += (
+            " For blades or striking objects, keep the metal silhouette physically separate and show the exact contact point with two distinct hard edges."
+        )
+    return detail
 
 
 def create_job(store: LocalStore, job_type: JobType, target_id: str, project_id: str | None = None) -> Job:
@@ -388,12 +454,12 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
     if renderer.lower() in {"comfy", "comfy_ltx", "ltx", "ltxrenderer"}:
         project = store.get_project(project_id)
         continuity = _continuity_bible(project, graph)
-        contact = _contact_detail_prompt(f"{shot.visual_action} {project.script_prompt}")
+        precision = _precision_detail_prompt(f"{shot.visual_action} {project.script_prompt}")
         prompt = (
             f"{continuity} "
             f"{shot.visual_action}. {shot.purpose}. "
             f"Camera: {shot.camera.get('movement', 'cinematic motion')}. "
-            f"{contact} "
+            f"{precision} "
             f"Continuity rules: {'; '.join(shot.continuity_rules)}. "
             "Cinematic, coherent, natural motion, detailed scene, grounded live-action footage."
         )
@@ -550,21 +616,27 @@ def render_comfy_ltx_shot(
         "ultra": 1.0,
     }
     preset_key = preset.lower()
-    contact_critical = _contains_contact_action(f"{project.script_prompt} {shot.visual_action}")
+    precision_text = f"{project.script_prompt} {shot.visual_action}"
+    precision_critical = _requires_precision_render(precision_text)
+    contact_critical = _contains_blade_action(precision_text)
     source_seconds = min(
         shot.duration,
         shot.duration
-        if contact_critical
+        if precision_critical
         else max(source_limits.get(preset_key, 1.75), shot.duration * speed_floor.get(preset_key, 0.8)),
     )
-    render_preset = "balanced" if contact_critical and preset_key in {"turbo", "fast", "draft", "preview"} else preset
+    render_preset = preset
+    if precision_critical and preset_key in {"turbo", "fast", "draft", "preview"}:
+        render_preset = "balanced"
+    elif precision_critical and preset_key == "balanced":
+        render_preset = "high"
     continuity = _continuity_bible(project, graph)
-    contact = _contact_detail_prompt(f"{project.script_prompt} {shot.visual_action}")
+    precision = _precision_detail_prompt(precision_text)
     prompt = (
         f"{continuity} "
         f"{shot.visual_action}. {shot.purpose}. "
         f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "
-        f"{contact} "
+        f"{precision} "
         f"Continuity rules: {'; '.join(shot.continuity_rules)}. "
         "Cinematic realistic video, coherent motion, natural lighting, grounded live-action footage."
     )
@@ -610,6 +682,7 @@ def render_comfy_ltx_shot(
             "source_seconds": source_seconds,
             "target_seconds": shot.duration,
             "prompt": prompt,
+            "precision_critical": precision_critical,
             "contact_critical": contact_critical,
             "render_preset": render_preset,
         },

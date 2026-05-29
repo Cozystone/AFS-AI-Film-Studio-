@@ -150,19 +150,20 @@ def build_ltx_api_prompt(
     video_only: bool = True,
 ) -> dict[str, Any]:
     profiles = {
-        "turbo": {"width": 320, "height": 192, "fps": 16, "max_frames": 33},
-        "fast": {"width": 384, "height": 216, "fps": 16, "max_frames": 41},
-        "draft": {"width": 352, "height": 192, "fps": 16, "max_frames": 41},
-        "preview": {"width": 384, "height": 216, "fps": 20, "max_frames": 61},
-        "balanced": {"width": 512, "height": 288, "fps": 20, "max_frames": 73},
-        "high": {"width": 640, "height": 360, "fps": 20, "max_frames": 81},
-        "ultra": {"width": 640, "height": 360, "fps": 24, "max_frames": 97},
+        "turbo": {"width": 320, "height": 192, "fps": 16, "max_frames": 33, "steps": 4},
+        "fast": {"width": 448, "height": 256, "fps": 16, "max_frames": 49, "steps": 4},
+        "draft": {"width": 384, "height": 216, "fps": 16, "max_frames": 41, "steps": 4},
+        "preview": {"width": 448, "height": 256, "fps": 20, "max_frames": 61, "steps": 4},
+        "balanced": {"width": 576, "height": 320, "fps": 20, "max_frames": 81, "steps": 5},
+        "high": {"width": 640, "height": 384, "fps": 20, "max_frames": 97, "steps": 6},
+        "ultra": {"width": 704, "height": 384, "fps": 24, "max_frames": 121, "steps": 7},
     }
     profile = profiles.get(preset.lower(), profiles["preview"])
     fps = int(profile["fps"])
     frames = max(25, min(int(profile["max_frames"]), int(seconds * fps)))
     width = int(profile["width"])
     height = int(profile["height"])
+    steps = int(profile["steps"])
     prompt = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"}},
         "2": {
@@ -182,7 +183,10 @@ def build_ltx_api_prompt(
             "class_type": "CLIPTextEncode",
             "inputs": {
                 "clip": ["3", 0],
-                "text": "SMPTE bars, color bars, test pattern, calibration chart, TV test screen, static frame, still image, distorted, ugly, low quality",
+                "text": (
+                    "SMPTE bars, color bars, test pattern, calibration chart, TV test screen, static frame, still image, "
+                    "distorted, ugly, low quality, blurry, smeared, melted objects, fused hands, warped face, illegible text"
+                ),
             },
         },
         "6": {"class_type": "LTXVConditioning", "inputs": {"positive": ["4", 0], "negative": ["5", 0], "frame_rate": float(fps)}},
@@ -191,7 +195,7 @@ def build_ltx_api_prompt(
         "9": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
         "10": {
             "class_type": "LTXVScheduler",
-            "inputs": {"steps": 4, "max_shift": 2.05, "base_shift": 0.95, "stretch": True, "terminal": 0.1, "latent": ["19", 0]},
+            "inputs": {"steps": steps, "max_shift": 2.05, "base_shift": 0.95, "stretch": True, "terminal": 0.1, "latent": ["19", 0]},
         },
         "11": {
             "class_type": "GuiderParameters",

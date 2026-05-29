@@ -122,9 +122,9 @@ const loras = ["ltx-2.3-22b-distilled-lora-384.safetensors", "none"];
 const textEncoders = ["gemma_3_12B_it_fp4_mixed.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"];
 const qualityOptions = [
   { label: "Turbo - fastest draft", value: "turbo" },
-  { label: "Fast - 384px preview", value: "fast" },
-  { label: "Balanced - 720p export", value: "balanced" },
-  { label: "High - approved shots", value: "high" },
+  { label: "Fast - 448px preview", value: "fast" },
+  { label: "Balanced - sharper story", value: "balanced" },
+  { label: "High - precision shots", value: "high" },
   { label: "Ultra - master only", value: "ultra" },
 ];
 const exampleScript =
@@ -1575,10 +1575,10 @@ function estimateRenderSeconds({ checkpoint, outputQuality }: { checkpoint: stri
   if (checkpoint === "mock") return 2;
   const qualityEstimate: Record<string, number> = {
     turbo: 45,
-    fast: 75,
-    balanced: 170,
-    high: 260,
-    ultra: 330,
+    fast: 95,
+    balanced: 220,
+    high: 340,
+    ultra: 470,
   };
   return qualityEstimate[outputQuality] ?? 95;
 }
