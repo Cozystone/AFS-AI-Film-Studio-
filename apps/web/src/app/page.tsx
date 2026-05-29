@@ -648,7 +648,14 @@ function selectFinalOutput(item: GalleryItem) {
                 </div>
               )}
             </div>
-            <ShotTimeline items={timelineItems} graph={graph} snapshot={displayProgressSnapshot} t={t} orchestratorUrl={orchestratorUrl} />
+            <ShotTimeline
+              items={timelineItems}
+              graph={graph}
+              plannedSceneCount={storyboardScenes}
+              snapshot={displayProgressSnapshot}
+              t={t}
+              orchestratorUrl={orchestratorUrl}
+            />
             <RenderSettingsPanel
               styleHint={styleHint}
               setStyleHint={setStyleHint}
@@ -1080,17 +1087,19 @@ function GalleryCard({
 function ShotTimeline({
   items,
   graph,
+  plannedSceneCount,
   snapshot,
   t,
   orchestratorUrl,
 }: {
   items: GalleryItem[];
   graph: CineGraph | null;
+  plannedSceneCount: number;
   snapshot: ReturnType<typeof getProductionProgressSnapshot>;
   t: Record<string, string>;
   orchestratorUrl: string;
 }) {
-  const clips = buildTimelineClips(graph, items, snapshot.percent);
+  const clips = buildTimelineClips(graph, items, snapshot.percent, plannedSceneCount);
   const transitions = buildTransitionItems(clips);
 
   return (
@@ -1166,16 +1175,26 @@ type TimelineClip = {
   progress: number;
 };
 
-function buildTimelineClips(graph: CineGraph | null, items: GalleryItem[], percent: number): TimelineClip[] {
+function buildTimelineClips(graph: CineGraph | null, items: GalleryItem[], percent: number, plannedSceneCount: number): TimelineClip[] {
   const shotItems = items.filter((item) => item.type === "video_shot");
   if (!graph || graph.shots.length === 0) {
-    return shotItems.map((item) => ({
-      id: item.artifact_id,
-      label: item.label,
-      mediaUrl: item.media_url,
-      status: "done",
-      statusLabel: "완료",
-      progress: 100,
+    if (shotItems.length > 0) {
+      return shotItems.map((item) => ({
+        id: item.artifact_id,
+        label: item.label,
+        mediaUrl: item.media_url,
+        status: "done",
+        statusLabel: "완료",
+        progress: 100,
+      }));
+    }
+    return Array.from({ length: Math.max(1, plannedSceneCount) }, (_, index) => ({
+      id: `planned-${index + 1}`,
+      label: `Scene ${index + 1}`,
+      mediaUrl: null,
+      status: percent > 0 ? "keyframing" : "queued",
+      statusLabel: percent > 0 ? "컷 설계 대기" : "계획됨",
+      progress: percent > 0 ? Math.max(5, Math.min(60, percent * 4)) : 0,
     }));
   }
 
