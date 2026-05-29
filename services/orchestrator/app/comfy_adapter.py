@@ -140,10 +140,28 @@ def _patch_ltx_workflow(prompt: dict[str, Any], text: str, prefix: str, seed: in
     return prompt
 
 
-def build_ltx_api_prompt(text: str, prefix: str, seed: int = 1234, seconds: float = 3.0, base_url: str = DEFAULT_COMFY_URL) -> dict[str, Any]:
-    frames = max(25, min(97, int(seconds * 25)))
-    width = 384
-    height = 216
+def build_ltx_api_prompt(
+    text: str,
+    prefix: str,
+    seed: int = 1234,
+    seconds: float = 3.0,
+    base_url: str = DEFAULT_COMFY_URL,
+    preset: str = "preview",
+) -> dict[str, Any]:
+    profiles = {
+        "turbo": {"width": 320, "height": 192, "fps": 16, "max_frames": 33},
+        "fast": {"width": 352, "height": 192, "fps": 16, "max_frames": 41},
+        "draft": {"width": 352, "height": 192, "fps": 16, "max_frames": 41},
+        "preview": {"width": 384, "height": 216, "fps": 20, "max_frames": 61},
+        "balanced": {"width": 384, "height": 216, "fps": 25, "max_frames": 73},
+        "high": {"width": 384, "height": 216, "fps": 25, "max_frames": 97},
+        "ultra": {"width": 384, "height": 216, "fps": 25, "max_frames": 97},
+    }
+    profile = profiles.get(preset.lower(), profiles["preview"])
+    fps = int(profile["fps"])
+    frames = max(25, min(int(profile["max_frames"]), int(seconds * fps)))
+    width = int(profile["width"])
+    height = int(profile["height"])
     return {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"}},
         "2": {
@@ -160,7 +178,7 @@ def build_ltx_api_prompt(text: str, prefix: str, seed: int = 1234, seconds: floa
         },
         "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["3", 0], "text": text}},
         "5": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["3", 0], "text": "test pattern, color bars, still image, static, distorted, ugly"}},
-        "6": {"class_type": "LTXVConditioning", "inputs": {"positive": ["4", 0], "negative": ["5", 0], "frame_rate": 25.0}},
+        "6": {"class_type": "LTXVConditioning", "inputs": {"positive": ["4", 0], "negative": ["5", 0], "frame_rate": float(fps)}},
         "7": {"class_type": "EmptyLTXVLatentVideo", "inputs": {"width": width, "height": height, "length": frames, "batch_size": 1}},
         "8": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
         "9": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
@@ -202,10 +220,10 @@ def build_ltx_api_prompt(text: str, prefix: str, seed: int = 1234, seconds: floa
                 "working_dtype": "auto",
             },
         },
-        "15": {"class_type": "CreateVideo", "inputs": {"images": ["14", 0], "fps": 25.0}},
+        "15": {"class_type": "CreateVideo", "inputs": {"images": ["14", 0], "fps": float(fps)}},
         "16": {"class_type": "SaveVideo", "inputs": {"video": ["15", 0], "filename_prefix": prefix.replace("\\", "/"), "format": "mp4", "codec": "h264"}},
         "17": {"class_type": "LTXVAudioVAELoader", "inputs": {"ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"}},
-        "18": {"class_type": "LTXVEmptyLatentAudio", "inputs": {"frames_number": frames, "frame_rate": 25, "batch_size": 1, "audio_vae": ["17", 0]}},
+        "18": {"class_type": "LTXVEmptyLatentAudio", "inputs": {"frames_number": frames, "frame_rate": fps, "batch_size": 1, "audio_vae": ["17", 0]}},
         "19": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["7", 0], "audio_latent": ["18", 0]}},
         "20": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["13", 0]}},
         "21": {"class_type": "LTXVAudioVAEDecode", "inputs": {"audio_vae": ["17", 0], "samples": ["20", 1]}},
@@ -240,12 +258,19 @@ def _copy_comfy_output(base_url: str, history: dict[str, Any], destination: Path
     raise ComfyAdapterError("ComfyUI completed but no video output was found")
 
 
-def render_ltx_video(text: str, destination: Path, seconds: float = 3.0, seed: int | None = None, base_url: str = DEFAULT_COMFY_URL) -> Path:
+def render_ltx_video(
+    text: str,
+    destination: Path,
+    seconds: float = 3.0,
+    seed: int | None = None,
+    base_url: str = DEFAULT_COMFY_URL,
+    preset: str = "preview",
+) -> Path:
     if not comfy_available(base_url):
         raise ComfyAdapterError(f"ComfyUI is not available at {base_url}")
     seed = seed if seed is not None else int(time.time()) % 1_000_000_000
     prefix = f"AFS/{destination.stem}_{uuid.uuid4().hex[:8]}"
-    prompt = build_ltx_api_prompt(text=text, prefix=prefix, seed=seed, seconds=seconds, base_url=base_url)
+    prompt = build_ltx_api_prompt(text=text, prefix=prefix, seed=seed, seconds=seconds, base_url=base_url, preset=preset)
     result = _post_json(f"{base_url}/prompt", {"prompt": prompt, "client_id": f"afs-{uuid.uuid4().hex}"}, timeout=30)
     prompt_id = result["prompt_id"]
 

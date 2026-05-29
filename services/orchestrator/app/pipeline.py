@@ -294,7 +294,13 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
             "Cinematic, coherent, natural motion, detailed scene, no test pattern, no color bars."
         )
         try:
-            render_ltx_video(text=prompt, destination=video_path, seconds=chunk.duration, seed=1234 + abs(hash(chunk_id)) % 100000)
+            render_ltx_video(
+                text=prompt,
+                destination=video_path,
+                seconds=chunk.duration,
+                seed=1234 + abs(hash(chunk_id)) % 100000,
+                preset="preview",
+            )
         except ComfyAdapterError as exc:
             failure_path = out_dir / "video.comfy_failed.txt"
             failure_path.write_text(str(exc), encoding="utf-8")
@@ -452,7 +458,8 @@ def render_comfy_ltx_shot(
     raw_path = out_dir / "shot.raw.mp4"
     final_path = out_dir / "shot.mp4"
     source_limits = {
-        "fast": 1.35,
+        "turbo": 1.0,
+        "fast": 1.2,
         "draft": 1.35,
         "preview": 1.75,
         "balanced": 2.25,
@@ -465,7 +472,7 @@ def render_comfy_ltx_shot(
         f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "
         "Cinematic realistic video, coherent motion, natural lighting, no color bars, no test pattern."
     )
-    render_ltx_video(text=prompt, destination=raw_path, seconds=source_seconds, seed=1234 + abs(hash(shot_id)) % 100000)
+    render_ltx_video(text=prompt, destination=raw_path, seconds=source_seconds, seed=1234 + abs(hash(shot_id)) % 100000, preset=preset)
     if _ffmpeg_available() and shot.duration > source_seconds and raw_path.exists():
         ratio = shot.duration / source_seconds
         result = subprocess.run(

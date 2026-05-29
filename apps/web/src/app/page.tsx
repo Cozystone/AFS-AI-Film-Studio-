@@ -121,6 +121,7 @@ const checkpoints = ["ltx-2.3-22b-dev-fp8.safetensors", "wan2.1_t2v_1.3B_fp16.sa
 const loras = ["ltx-2.3-22b-distilled-lora-384.safetensors", "none"];
 const textEncoders = ["gemma_3_12B_it_fp4_mixed.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"];
 const qualityOptions = [
+  { label: "Turbo - fastest draft", value: "turbo" },
   { label: "Fast - 384px preview", value: "fast" },
   { label: "Balanced - 720p export", value: "balanced" },
   { label: "High - approved shots", value: "high" },
@@ -279,7 +280,7 @@ export default function Home() {
   const [checkpoint, setCheckpoint] = useState(checkpoints[0]);
   const [lora, setLora] = useState(loras[0]);
   const [textEncoder, setTextEncoder] = useState(textEncoders[0]);
-  const [outputQuality, setOutputQuality] = useState("fast");
+  const [outputQuality, setOutputQuality] = useState("turbo");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [clipLength, setClipLength] = useState(3);
   const [renderStyle, setRenderStyle] = useState("cinematic");
@@ -448,7 +449,7 @@ export default function Home() {
     };
     try {
       setStatus(t.creating);
-      setMovieTask("?꾨줈?앺듃 ?앹꽦", 0, 2, 3);
+      setMovieTask("프로젝트 생성", 0, 2, 3);
       const created = await request<{ project_id: string }>("/api/projects", {
         method: "POST",
         body: JSON.stringify({
@@ -465,7 +466,7 @@ export default function Home() {
       setProject(loaded);
 
       setStatus(t.planning);
-      setMovieTask("?λ㈃怨?而??ㅺ퀎", 2, 5, 6);
+      setMovieTask("장면과 컷 설계", 2, 5, 6);
       const planned = await request<CineGraph>(`/api/projects/${created.project_id}/plan`, { method: "POST" });
       setGraph(planned);
       totalEstimateSec = estimateMovieSeconds({
@@ -859,19 +860,21 @@ function RenderSettingsPanel({
   return (
     <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-100">?곸긽 ?ㅽ???/ ?뚮뜑 ?ㅼ젙</h3>
-        <p className="text-xs text-slate-500">?꾨━酉??꾨옒?먯꽌 而?援ъ꽦怨??뚮뜑 ?듭뀡??議곗젙?⑸땲??</p>
+        <h3 className="text-sm font-semibold text-slate-100">영상 스타일 / 렌더 설정</h3>
+        <p className="text-xs text-slate-500">프리뷰 아래에서 컷 구성과 렌더 옵션을 조정합니다.</p>
       </div>
       <div className="grid gap-3">
         <label className="text-sm text-slate-300">
-          ?곸긽 ?ㅽ???          <input
+          영상 스타일
+          <input
             value={styleHint}
             onChange={(event) => setStyleHint(event.target.value)}
             className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
           />
         </label>
         <label className="text-sm text-slate-300">
-          ?뚮━ ?ㅽ???          <input
+          소리 스타일
+          <input
             value={audioHint}
             onChange={(event) => setAudioHint(event.target.value)}
             className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
@@ -1489,7 +1492,8 @@ function formatDuration(value: number) {
 function estimateRenderSeconds({ checkpoint, outputQuality }: { checkpoint: string; outputQuality: string }) {
   if (checkpoint === "mock") return 2;
   const qualityEstimate: Record<string, number> = {
-    fast: 75,
+    turbo: 45,
+    fast: 65,
     balanced: 125,
     high: 160,
     ultra: 210,
