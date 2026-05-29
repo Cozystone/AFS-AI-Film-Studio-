@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0b0d10;
-  --foreground: #eef2f6;
+  --background: #07090d;
+  --foreground: #eef6ff;
+  --panel: rgba(16, 22, 31, 0.62);
+  --panel-strong: rgba(18, 25, 35, 0.82);
+  --panel-line: rgba(168, 205, 255, 0.14);
+  --panel-glow: rgba(45, 212, 191, 0.14);
+  --field: rgba(5, 9, 15, 0.62);
+  --accent: #34d399;
+  --accent-2: #38bdf8;
+  --warning: #fbbf24;
 }
 
 @theme inline {
@@ -20,13 +28,131 @@
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(52, 211, 153, 0.16), transparent 32rem),
+    radial-gradient(circle at 80% 4%, rgba(56, 189, 248, 0.14), transparent 34rem),
+    radial-gradient(circle at 58% 82%, rgba(129, 140, 248, 0.11), transparent 36rem),
+    linear-gradient(135deg, #06080c 0%, #0b1018 46%, #080a0f 100%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
 }
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    color 180ms ease;
+}
+
+button:not(:disabled):active,
+a:active {
+  transform: translateY(1px);
+}
+
+.liquid-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.liquid-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 82%);
+}
+
+.liquid-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025) 42%, rgba(255, 255, 255, 0.015)),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 24px 70px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(22px) saturate(140%);
+}
+
+.liquid-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.12), transparent 22%, transparent 72%, rgba(52, 211, 153, 0.08)),
+    radial-gradient(circle at 14% 0%, rgba(56, 189, 248, 0.11), transparent 18rem);
+}
+
+.liquid-card > * {
+  position: relative;
+}
+
+.liquid-field {
+  border: 1px solid rgba(168, 205, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01)),
+    var(--field);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.liquid-field:focus {
+  border-color: rgba(52, 211, 153, 0.76);
+  box-shadow:
+    0 0 0 3px rgba(52, 211, 153, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.liquid-button-primary {
+  background:
+    linear-gradient(135deg, rgba(52, 211, 153, 1), rgba(45, 212, 191, 0.96) 52%, rgba(56, 189, 248, 0.92));
+  box-shadow:
+    0 14px 34px rgba(45, 212, 191, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.liquid-progress {
+  background: linear-gradient(90deg, #34d399, #22d3ee 55%, #a78bfa);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.25);
+}
+
+.glass-scrollbar {
+  scrollbar-color: rgba(148, 163, 184, 0.34) transparent;
+}
+
+.glass-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.glass-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.glass-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
 }

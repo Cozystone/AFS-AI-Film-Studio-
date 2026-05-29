@@ -127,6 +127,10 @@ const qualityOptions = [
   { label: "High - precision shots", value: "high" },
   { label: "Ultra - master only", value: "ultra" },
 ];
+const fieldClass =
+  "liquid-field mt-1 w-full rounded-lg px-3 text-slate-100 outline-none placeholder:text-slate-500";
+const buttonGhostClass =
+  "rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200 shadow-sm shadow-black/20 hover:border-white/20 hover:bg-white/[0.08]";
 const exampleScript =
   "예: 버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.";
 const exampleTitle = "예: Last Tape";
@@ -593,27 +597,27 @@ function selectFinalOutput(item: GalleryItem) {
   }
 
   return (
-    <main className="min-h-screen bg-[#0b0d10] text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-800 bg-[#0b0d10]/95 backdrop-blur">
+    <main className="liquid-shell min-h-screen text-slate-100">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-[#07090d]/72 shadow-lg shadow-black/20 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-emerald-400 text-slate-950">
+            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-300 via-teal-300 to-sky-300 text-slate-950 shadow-lg shadow-emerald-950/30">
               <Clapperboard size={22} />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">{t.appName}</h1>
+              <h1 className="text-lg font-semibold tracking-wide">{t.appName}</h1>
               <p className="text-sm text-slate-400">{t.subtitle}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800" type="button" onClick={resetWorkspace}>
+            <button className={buttonGhostClass} type="button" onClick={resetWorkspace}>
               {t.make}
             </button>
-            <a className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800" href="#result">
+            <a className={buttonGhostClass} href="#result">
               {t.result}
             </a>
             <button
-              className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-200 hover:bg-slate-800"
+              className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-200 shadow-sm shadow-black/20 hover:border-white/20 hover:bg-white/[0.08]"
               type="button"
               onClick={() => setAlbumOpen(true)}
             >
@@ -621,7 +625,7 @@ function selectFinalOutput(item: GalleryItem) {
               {t.album}
             </button>
             <button
-              className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-200"
+              className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-200 shadow-sm shadow-black/20 hover:border-white/20 hover:bg-white/[0.08]"
               type="button"
               onClick={() => setLanguage((current) => (current === "ko" ? "en" : "ko"))}
             >
@@ -632,7 +636,7 @@ function selectFinalOutput(item: GalleryItem) {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1700px] gap-4 px-5 py-5 xl:grid-cols-[440px_800px_340px]">
+      <div className="mx-auto grid max-w-[1700px] gap-5 px-5 py-5 xl:grid-cols-[440px_800px_340px]">
         <section id="make" className="space-y-4">
           <Panel title={t.inputTitle} description={t.inputBody} icon={<Sparkles size={18} className="text-emerald-300" />}>
             <div className="grid gap-3">
@@ -642,7 +646,7 @@ function selectFinalOutput(item: GalleryItem) {
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   placeholder={exampleTitle}
-                  className="mt-1 h-11 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-400"
+                  className={`${fieldClass} h-11`}
                 />
               </label>
               <label className="text-sm text-slate-300">
@@ -652,12 +656,12 @@ function selectFinalOutput(item: GalleryItem) {
                   onChange={(event) => setScriptPrompt(event.target.value)}
                   placeholder={exampleScript}
                   rows={9}
-                  className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-400"
+                  className={`${fieldClass} resize-none py-3`}
                 />
               </label>
               <MovieProductionProgress snapshot={displayProgressSnapshot} />
               <button
-                className="mt-1 flex h-13 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-base font-semibold text-slate-950 disabled:opacity-60"
+                className="liquid-button-primary mt-1 flex h-13 items-center justify-center gap-2 rounded-xl px-4 text-base font-semibold text-slate-950 disabled:opacity-60"
                 disabled={busy || !scriptPrompt.trim()}
                 type="button"
                 onClick={createMovieFromText}
@@ -669,20 +673,20 @@ function selectFinalOutput(item: GalleryItem) {
           </Panel>
 
           <Panel title={t.progress} icon={<Activity size={18} className="text-violet-300" />}>
-            <p className="mb-3 rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-emerald-300">{status}</p>
+            <p className="mb-3 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.045] p-3 text-sm text-emerald-200 shadow-inner shadow-black/20">{status}</p>
             <JobProgressPanel jobs={latestJobs} t={t} />
           </Panel>
         </section>
 
         <section id="result" className="space-y-4">
           <Panel title={t.previewTitle} description={t.previewBody} icon={<MonitorPlay size={18} className="text-amber-300" />}>
-            <div className="overflow-hidden rounded-md border border-slate-800 bg-black shadow-2xl shadow-black/30">
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/50 ring-1 ring-white/[0.03]">
               {moviePreviewUrl ? (
                 <div className="aspect-video w-full">
                   <video controls className="h-full w-full bg-black object-contain" src={moviePreviewUrl} />
                 </div>
               ) : (
-                <div className="grid aspect-video w-full place-items-center p-6 text-center text-sm text-slate-500">
+                <div className="grid aspect-video w-full place-items-center bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.92),#02040a)] p-6 text-center text-sm text-slate-500">
                   <div>
                     <MonitorPlay className="mx-auto mb-3 text-slate-700" size={44} />
                     {t.noPreview}
@@ -735,7 +739,7 @@ function selectFinalOutput(item: GalleryItem) {
           </Panel>
         </section>
 
-        <aside className="xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
+        <aside className="glass-scrollbar xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
           <ResultsRail
             items={finalGallery}
             t={t}
@@ -749,7 +753,7 @@ function selectFinalOutput(item: GalleryItem) {
 
       <section className="mx-auto max-w-[1600px] px-5 pb-8">
         <button
-          className="flex h-11 w-full items-center justify-between rounded-md border border-slate-800 bg-[#11151b] px-4 text-left text-sm font-medium text-slate-200"
+          className="liquid-card flex h-11 w-full items-center justify-between rounded-xl px-4 text-left text-sm font-medium text-slate-200"
           type="button"
           onClick={() => setAdvancedOpen((current) => !current)}
         >
@@ -762,7 +766,7 @@ function selectFinalOutput(item: GalleryItem) {
             <Panel title={t.shots}>
               <div className="space-y-2">
                 {graph?.shots.map((shot) => (
-                  <div key={shot.shot_id} className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm">
+                  <div key={shot.shot_id} className="rounded-lg border border-white/10 bg-white/[0.035] p-3 text-sm shadow-inner shadow-black/20">
                     <p className="font-mono text-xs text-emerald-300">{shot.shot_id}</p>
                     <p className="mt-1 text-slate-200">{shot.purpose}</p>
                   </div>
@@ -779,9 +783,9 @@ function selectFinalOutput(item: GalleryItem) {
                   value={orchestratorInput}
                   onChange={(event) => setOrchestratorInput(event.target.value)}
                   placeholder="/api/orchestrator"
-                  className="min-w-0 flex-1 rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-2 text-slate-100 outline-none focus:border-emerald-400"
+                  className={`${fieldClass} min-w-0 flex-1 py-2`}
                 />
-                <button className="rounded-md bg-emerald-400 px-3 text-sm font-semibold text-slate-950" type="button" onClick={saveOrchestratorUrl}>
+                <button className="liquid-button-primary rounded-lg px-3 text-sm font-semibold text-slate-950" type="button" onClick={saveOrchestratorUrl}>
                   {t.save}
                 </button>
               </div>
@@ -821,7 +825,7 @@ function SelectField({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
+        className={`${fieldClass} h-10`}
       >
         {children}
       </select>
@@ -843,16 +847,16 @@ function MovieProductionProgress({
   };
 }) {
   return (
-    <div className="rounded-md border border-slate-800 bg-[#080b0f] p-3">
+    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3 shadow-inner shadow-black/20">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-100">통합 영화 제작 진행</p>
           <p className="mt-0.5 text-xs text-slate-500">{snapshot.label}</p>
         </div>
-        <span className="font-mono text-lg font-semibold text-emerald-300">{snapshot.percent}%</span>
+        <span className="font-mono text-lg font-semibold text-cyan-200">{snapshot.percent}%</span>
       </div>
-      <div className="h-3 overflow-hidden rounded bg-slate-800">
-        <div className="h-full rounded bg-emerald-400 transition-[width] duration-700" style={{ width: `${snapshot.percent}%` }} />
+      <div className="h-3 overflow-hidden rounded-full border border-white/10 bg-black/40">
+        <div className="liquid-progress h-full rounded-full transition-[width] duration-700" style={{ width: `${snapshot.percent}%` }} />
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500">
         <span>경과 {formatDuration(snapshot.elapsedSec)}</span>
@@ -926,7 +930,7 @@ function RenderSettingsPanel({
   setIncludeAudio: (value: boolean) => void;
 }) {
   return (
-    <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3 shadow-inner shadow-black/20">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-slate-100">영상 스타일 / 렌더 설정</h3>
         <p className="text-xs text-slate-500">프리뷰 아래에서 컷 구성과 렌더 옵션을 조정합니다.</p>
@@ -937,7 +941,7 @@ function RenderSettingsPanel({
           <input
             value={styleHint}
             onChange={(event) => setStyleHint(event.target.value)}
-            className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
+            className={`${fieldClass} h-10`}
           />
         </label>
         <label className="text-sm text-slate-300">
@@ -945,7 +949,7 @@ function RenderSettingsPanel({
           <input
             value={audioHint}
             onChange={(event) => setAudioHint(event.target.value)}
-            className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
+            className={`${fieldClass} h-10`}
           />
         </label>
         <div className="grid gap-3 md:grid-cols-2">
@@ -1012,11 +1016,11 @@ function RenderSettingsPanel({
               value={seed}
               onChange={(event) => setSeed(event.target.value)}
               placeholder="Empty = random"
-              className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
+              className={`${fieldClass} h-10`}
             />
           </label>
         </div>
-        <div className="flex flex-wrap gap-4 rounded-md border border-slate-800 bg-[#080b0f] p-3 text-sm text-slate-300">
+        <div className="flex flex-wrap gap-4 rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-300">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={keepContinuity} onChange={(event) => setKeepContinuity(event.target.checked)} />
             Keep character continuity
@@ -1047,7 +1051,7 @@ function ResultsRail({
   onOpenAlbum: () => void;
 }) {
   return (
-    <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
+    <section className="liquid-card rounded-2xl p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Film size={18} className="text-emerald-300" />
@@ -1057,7 +1061,7 @@ function ResultsRail({
           </div>
         </div>
         <button
-          className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-200 hover:bg-slate-800"
+          className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-200 hover:border-white/20 hover:bg-white/[0.08]"
           type="button"
           onClick={onOpenAlbum}
         >
@@ -1099,8 +1103,8 @@ function GalleryCard({
   const isFinal = item.type === "final_movie" || item.type === "video_project";
   return (
     <article
-      className={`rounded-md border bg-[#0b0d10] p-3 transition ${
-        selected ? "border-emerald-400/80 shadow-lg shadow-emerald-950/30" : "border-slate-800 hover:border-slate-700"
+      className={`rounded-xl border bg-white/[0.035] p-3 shadow-inner shadow-black/20 transition ${
+        selected ? "border-emerald-300/80 shadow-lg shadow-emerald-950/30" : "border-white/10 hover:border-white/20 hover:bg-white/[0.055]"
       }`}
     >
       <button className="w-full text-left" type="button" onClick={onSelect}>
@@ -1109,11 +1113,11 @@ function GalleryCard({
             <p className="truncate text-sm font-semibold text-slate-100">{item.project_title}</p>
             <p className="mt-0.5 truncate text-xs text-slate-500">{isFinal ? t.finalMovie : `${t.shotPreview} / ${item.label}`}</p>
           </div>
-          <span className={isFinal ? "rounded border border-emerald-500/50 px-2 py-1 text-xs text-emerald-300" : "rounded border border-slate-700 px-2 py-1 text-xs text-slate-300"}>
+          <span className={isFinal ? "rounded-full border border-emerald-300/40 bg-emerald-300/10 px-2 py-1 text-xs text-emerald-200" : "rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300"}>
             {isFinal ? "FINAL" : "SHOT"}
           </span>
         </div>
-        <video className="aspect-video w-full rounded border border-slate-800 bg-black object-cover" src={mediaUrl} muted preload="metadata" />
+        <video className="aspect-video w-full rounded-lg border border-white/10 bg-black object-cover" src={mediaUrl} muted preload="metadata" />
       </button>
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-slate-500">
         <span className="truncate">{item.renderer}</span>
@@ -1145,33 +1149,33 @@ function ShotTimeline({
   const transitions = buildTransitionItems(clips);
 
   return (
-    <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3 shadow-inner shadow-black/20">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-100">{t.editTimeline}</h3>
           <p className="text-xs text-slate-500">{t.editTimelineHint}</p>
         </div>
-        <span className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-400">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-400">
           {clips.filter((clip) => clip.status === "done").length}/{clips.length}
         </span>
       </div>
       {clips.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
       {clips.length > 0 ? (
-        <div className="overflow-x-auto rounded-md border border-slate-800 bg-[#0d1117]">
+        <div className="glass-scrollbar overflow-x-auto rounded-xl border border-white/10 bg-black/20">
           <div className="min-w-max">
-            <div className="grid border-b border-slate-800" style={{ gridTemplateColumns: `44px repeat(${clips.length}, 176px)` }}>
-              <div className="grid place-items-center border-r border-slate-800 bg-[#11151b] text-xs text-slate-500">{t.sceneTrack}</div>
+            <div className="grid border-b border-white/10" style={{ gridTemplateColumns: `44px repeat(${clips.length}, 176px)` }}>
+              <div className="grid place-items-center border-r border-white/10 bg-white/[0.035] text-xs text-slate-500">{t.sceneTrack}</div>
               {clips.map((clip, index) => (
-                <article key={clip.id} className="border-r border-slate-800 p-2">
-                  <div className={`overflow-hidden rounded-md border bg-slate-900 ${clip.status === "done" ? "border-emerald-500/40" : clip.status === "rendering" ? "border-amber-400/60" : "border-slate-700"}`}>
+                <article key={clip.id} className="border-r border-white/10 p-2">
+                  <div className={`overflow-hidden rounded-lg border bg-slate-950/70 shadow-sm shadow-black/30 ${clip.status === "done" ? "border-emerald-300/45" : clip.status === "rendering" ? "border-amber-300/60" : "border-white/10"}`}>
                     {clip.mediaUrl ? (
                       <video className="aspect-video w-full bg-black object-cover" src={`${orchestratorUrl}${clip.mediaUrl}`} muted preload="metadata" />
                     ) : (
-                      <div className="grid aspect-video place-items-center bg-[#111827] p-3 text-center">
+                      <div className="grid aspect-video place-items-center bg-gradient-to-br from-slate-900 to-slate-950 p-3 text-center">
                         <div className="w-full">
                           <p className="text-xs font-medium text-slate-300">{clip.statusLabel}</p>
-                          <div className="mt-3 h-1.5 overflow-hidden rounded bg-slate-800">
-                            <div className="h-full rounded bg-amber-300 transition-[width]" style={{ width: `${clip.progress}%` }} />
+                          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/40">
+                            <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-cyan-300 transition-[width]" style={{ width: `${clip.progress}%` }} />
                           </div>
                         </div>
                       </div>
@@ -1185,18 +1189,18 @@ function ShotTimeline({
               ))}
             </div>
             <div className="grid" style={{ gridTemplateColumns: `44px repeat(${clips.length}, 176px)` }}>
-              <div className="grid place-items-center border-r border-slate-800 bg-[#11151b] text-xs text-slate-500">{t.bridgeTrack}</div>
+              <div className="grid place-items-center border-r border-white/10 bg-white/[0.035] text-xs text-slate-500">{t.bridgeTrack}</div>
               {clips.map((clip, index) => (
-                <div key={`${clip.id}-bridge`} className="border-r border-slate-800 p-2">
+                <div key={`${clip.id}-bridge`} className="border-r border-white/10 p-2">
                   {transitions[index] ? (
-                    <div className="grid aspect-video place-items-end rounded-md border border-slate-700 bg-gradient-to-b from-[#121a24] to-[#0b0d10] p-2">
+                    <div className="grid aspect-video place-items-end rounded-lg border border-white/10 bg-gradient-to-b from-slate-800/50 to-black/40 p-2">
                       <div className="w-full">
                         <p className="truncate text-xs text-slate-300">{t.bridgeClip}</p>
                         <p className="mt-1 font-mono text-xs text-slate-500">{transitions[index]}</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="aspect-video rounded-md border border-dashed border-slate-800 bg-[#0b0d10]" />
+                    <div className="aspect-video rounded-lg border border-dashed border-white/10 bg-black/20" />
                   )}
                 </div>
               ))}
@@ -1346,9 +1350,9 @@ function AlbumView({
 }) {
   const active = selectedItem ?? items[0] ?? null;
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 p-4 backdrop-blur">
-      <div className="mx-auto flex h-full max-w-[1500px] flex-col rounded-md border border-slate-800 bg-[#11151b]">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+    <div className="fixed inset-0 z-50 bg-black/76 p-4 backdrop-blur-xl">
+      <div className="liquid-card mx-auto flex h-full max-w-[1500px] flex-col rounded-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2">
             <Images size={19} className="text-emerald-300" />
             <div>
@@ -1356,12 +1360,12 @@ function AlbumView({
               <p className="text-xs text-slate-500">{items.length} {t.latestOutputs}</p>
             </div>
           </div>
-          <button className="grid size-9 place-items-center rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800" type="button" onClick={onClose} aria-label={t.close}>
+          <button className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]" type="button" onClick={onClose} aria-label={t.close}>
             <X size={18} />
           </button>
         </div>
         <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[1fr_360px]">
-          <div className="grid min-h-0 place-items-center overflow-hidden rounded-md border border-slate-800 bg-black">
+          <div className="grid min-h-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/40">
             {active ? (
               <div className="aspect-video w-full max-w-full">
                 <video controls className="h-full w-full bg-black object-contain" src={`${orchestratorUrl}${active.media_url}`} />
@@ -1370,7 +1374,7 @@ function AlbumView({
               <div className="grid aspect-video w-full place-items-center text-sm text-slate-500">{t.noOutputs}</div>
             )}
           </div>
-          <div className="min-h-0 overflow-y-auto">
+          <div className="glass-scrollbar min-h-0 overflow-y-auto">
             {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
             <div className="grid gap-3">
               {items.map((item) => (
@@ -1393,9 +1397,9 @@ function AlbumView({
 
 function Panel({ title, description, icon, children }: { title: string; description?: string; icon?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
+    <section className="liquid-card rounded-2xl p-4">
       <div className="mb-4 flex items-start gap-2">
-        {icon ? <div className="mt-0.5">{icon}</div> : null}
+        {icon ? <div className="mt-0.5 grid size-8 place-items-center rounded-lg border border-white/10 bg-white/[0.045]">{icon}</div> : null}
         <div>
           <h2 className="font-semibold text-slate-100">{title}</h2>
           {description ? <p className="mt-1 text-sm leading-5 text-slate-400">{description}</p> : null}
@@ -1408,7 +1412,7 @@ function Panel({ title, description, icon, children }: { title: string; descript
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="grid min-h-24 place-items-center rounded-md border border-dashed border-slate-700 bg-[#0b0d10] p-4 text-center text-sm text-slate-500">
+    <div className="grid min-h-24 place-items-center rounded-xl border border-dashed border-white/10 bg-black/20 p-4 text-center text-sm text-slate-500">
       {text}
     </div>
   );
@@ -1416,7 +1420,7 @@ function EmptyState({ text }: { text: string }) {
 
 function SystemUsagePanel({ usage, error, t }: { usage: SystemUsage | null; error: string | null; t: Record<string, string> }) {
   const gpu = usage?.gpu.gpus?.[0];
-  if (error) return <p className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-amber-300">{error}</p>;
+  if (error) return <p className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-200">{error}</p>;
   return (
     <div className="grid gap-2 md:grid-cols-2">
       <UsageMeter label={t.cpu} value={usage?.cpu.usage_percent ?? 0} detail={usage ? `${usage.cpu.core_count} cores` : "-"} />
@@ -1434,13 +1438,13 @@ function SystemUsagePanel({ usage, error, t }: { usage: SystemUsage | null; erro
 function UsageMeter({ label, value, detail }: { label: string; value: number; detail: string }) {
   const normalized = Math.max(0, Math.min(100, value));
   return (
-    <div className="rounded-md border border-slate-800 bg-[#0b0d10] p-3">
+    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3 shadow-inner shadow-black/20">
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-slate-200">{label}</span>
         <span className="font-mono text-xs text-slate-400">{normalized.toFixed(1)}%</span>
       </div>
-      <div className="h-2 overflow-hidden rounded bg-slate-800">
-        <div className="h-full rounded bg-emerald-400" style={{ width: `${normalized}%` }} />
+      <div className="h-2 overflow-hidden rounded-full bg-black/40">
+        <div className="liquid-progress h-full rounded-full" style={{ width: `${normalized}%` }} />
       </div>
       <p className="mt-2 truncate text-xs text-slate-500">{detail}</p>
     </div>
@@ -1461,16 +1465,16 @@ function JobProgressPanel({ jobs, t }: { jobs: Job[]; t: Record<string, string> 
 function JobProgressItem({ job, t }: { job: Job; t: Record<string, string> }) {
   const percent = Math.max(0, Math.min(100, Math.round(job.progress * 100)));
   return (
-    <div className="rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm">
+    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-sm shadow-inner shadow-black/20">
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-medium text-slate-200">{job.type}</p>
           <p className="truncate font-mono text-xs text-slate-500">{job.target_id}</p>
         </div>
-        <span className="rounded border border-slate-700 px-2 py-1 font-mono text-xs text-slate-300">{percent}%</span>
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-xs text-slate-300">{percent}%</span>
       </div>
-      <div className="h-2 overflow-hidden rounded bg-slate-800">
-        <div className="h-full rounded bg-emerald-400 transition-[width]" style={{ width: `${percent}%` }} />
+      <div className="h-2 overflow-hidden rounded-full bg-black/40">
+        <div className="liquid-progress h-full rounded-full transition-[width]" style={{ width: `${percent}%` }} />
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500">
         <span>
@@ -1638,7 +1642,7 @@ function getProductionProgressSnapshot(progress: ProductionProgress, nowMs: numb
 function Inspector({ title, data }: { title: string; data: unknown }) {
   return (
     <Panel title={title}>
-      <pre className="max-h-72 overflow-auto rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-xs leading-5 text-slate-300">
+      <pre className="glass-scrollbar max-h-72 overflow-auto rounded-xl border border-white/10 bg-black/25 p-3 text-xs leading-5 text-slate-300">
         {data ? JSON.stringify(data, null, 2) : "-"}
       </pre>
     </Panel>
