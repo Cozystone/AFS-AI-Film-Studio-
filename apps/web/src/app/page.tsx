@@ -115,7 +115,7 @@ type Language = "ko" | "en";
 
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
 void
-  "踰꾨젮吏?二쇱쑀?뚯뿉????泥?냼?꾩씠 ?≪? 罹좎퐫?붾줈 ?쒕줈瑜?李띾떎媛, 留덉?留됱뿉 ?щ씪吏?移쒓뎄???곸긽??諛쒓껄?섎뒗 30珥덉쭨由??낅┰?곹솕???곸긽.";
+  "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.";
 
 const checkpoints = ["ltx-2.3-22b-dev-fp8.safetensors", "wan2.1_t2v_1.3B_fp16.safetensors", "mock"];
 const loras = ["ltx-2.3-22b-distilled-lora-384.safetensors", "none"];
@@ -156,9 +156,9 @@ const copy = {
     projectJson: "Project JSON",
     orchestratorUrl: "Orchestrator URL",
     save: "저장",
-    proxyHint: "諛고룷 ?섍꼍?먯꽌???먮룞 ?꾨줉?쒕? ?ъ슜?⑸땲?? 吏곸젒 ?뚯뒪?명븷 ?뚮쭔 諛붽씀?몄슂.",
+    proxyHint: "배포 환경에서는 자동 프록시를 사용합니다. 직접 테스트할 때만 바꾸세요.",
     offline: "오케스트레이터 연결 안 됨",
-    noJobs: "?꾩쭅 ?묒뾽???놁뒿?덈떎.",
+    noJobs: "아직 작업이 없습니다.",
     cpu: "CPU",
     gpu: "GPU",
     memory: "메모리",
@@ -269,7 +269,7 @@ export default function Home() {
   const [orchestratorInput, setOrchestratorInput] = useState(initialOrchestratorUrl);
   const [title, setTitle] = useState("Last Tape");
   const [scriptPrompt, setScriptPrompt] = useState(
-    "踰꾨젮吏?二쇱쑀?뚯뿉????泥?냼?꾩씠 ?≪? 罹좎퐫?붾줈 ?쒕줈瑜?李띾떎媛, 留덉?留됱뿉 ?щ씪吏?移쒓뎄???곸긽??諛쒓껄?섎뒗 30珥덉쭨由??낅┰?곹솕???곸긽.",
+    "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.",
   );
   const [styleHint, setStyleHint] = useState("early 2000s camcorder, lo-fi indie film");
   const [audioHint, setAudioHint] = useState("fluorescent buzz, tape hiss, distant wind");
@@ -296,7 +296,6 @@ export default function Home() {
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [albumOpen, setAlbumOpen] = useState(false);
   const [selectedGalleryItem, setSelectedGalleryItem] = useState<GalleryItem | null>(null);
-  const [stitchingProjectId, setStitchingProjectId] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [progressClock, setProgressClock] = useState(0);
   const [productionProgress, setProductionProgress] = useState<ProductionProgress>({
@@ -526,26 +525,6 @@ export default function Home() {
     }
   }
 
-  async function buildStitchedPreview(projectId: string) {
-    setStitchingProjectId(projectId);
-    setStatus(t.exporting);
-    try {
-      const exported = await request<{ media_url: string | null }>(`/api/projects/${projectId}/export`, {
-        method: "POST",
-        body: JSON.stringify({ format: "mp4", resolution: "1280x720", include_audio: true }),
-      });
-      if (exported.media_url) {
-        setMoviePreviewUrl(`${orchestratorUrl}${exported.media_url}`);
-      }
-      await loadGallery();
-      setStatus(t.complete);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Export failed");
-    } finally {
-      setStitchingProjectId(null);
-    }
-  }
-
 function selectFinalOutput(item: GalleryItem) {
     setSelectedGalleryItem(item);
     if (isFinalGalleryItem(item)) {
@@ -690,14 +669,11 @@ function selectFinalOutput(item: GalleryItem) {
         <aside className="xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
           <ResultsRail
             items={finalGallery}
-            allItems={gallery}
             t={t}
             orchestratorUrl={orchestratorUrl}
             selectedId={selectedGalleryItem?.artifact_id ?? null}
             onSelect={selectFinalOutput}
             onOpenAlbum={() => setAlbumOpen(true)}
-            onBuildPreview={buildStitchedPreview}
-            stitchingProjectId={stitchingProjectId}
           />
         </aside>
       </div>
@@ -801,7 +777,7 @@ function MovieProductionProgress({
     <div className="rounded-md border border-slate-800 bg-[#080b0f] p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-100">?듯빀 ?곹솕 ?쒖옉 吏꾪뻾</p>
+          <p className="text-sm font-semibold text-slate-100">통합 영화 제작 진행</p>
           <p className="mt-0.5 text-xs text-slate-500">{snapshot.label}</p>
         </div>
         <span className="font-mono text-lg font-semibold text-emerald-300">{snapshot.percent}%</span>
@@ -986,27 +962,19 @@ function RenderSettingsPanel({
 
 function ResultsRail({
   items,
-  allItems,
   t,
   orchestratorUrl,
   selectedId,
   onSelect,
   onOpenAlbum,
-  onBuildPreview,
-  stitchingProjectId,
 }: {
   items: GalleryItem[];
-  allItems: GalleryItem[];
   t: Record<string, string>;
   orchestratorUrl: string;
   selectedId: string | null;
   onSelect: (item: GalleryItem) => void;
   onOpenAlbum: () => void;
-  onBuildPreview: (projectId: string) => void;
-  stitchingProjectId: string | null;
 }) {
-  const stitchCandidate = findStitchCandidate(allItems);
-
   return (
     <section className="rounded-md border border-slate-800 bg-[#11151b] p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -1026,23 +994,6 @@ function ResultsRail({
           {t.album}
         </button>
       </div>
-      {stitchCandidate ? (
-        <div className="mb-3 rounded-md border border-emerald-500/30 bg-emerald-950/20 p-3">
-          <p className="truncate text-sm font-medium text-slate-100">{stitchCandidate.title}</p>
-          <p className="mt-1 text-xs text-slate-400">
-            {stitchCandidate.shotCount} {t.shotPreview} / {t.partialPreviewHint}
-          </p>
-          <button
-            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-3 text-sm font-semibold text-slate-950 disabled:opacity-60"
-            type="button"
-            disabled={stitchingProjectId === stitchCandidate.projectId}
-            onClick={() => onBuildPreview(stitchCandidate.projectId)}
-          >
-            {stitchingProjectId === stitchCandidate.projectId ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />}
-            {t.buildPreview}
-          </button>
-        </div>
-      ) : null}
       {items.length === 0 ? <EmptyState text={t.noFinalOutputs} /> : null}
       <div className="space-y-3">
         {items.map((item) => (
@@ -1281,19 +1232,6 @@ function buildTransitionItems(items: { label: string }[]) {
     if (!next) return null;
     return `${item.label} -> ${next.label}`;
   });
-}
-
-function findStitchCandidate(items: GalleryItem[]) {
-  const projectIds = Array.from(new Set(items.map((item) => item.project_id)));
-  for (const projectId of projectIds) {
-    const projectItems = items.filter((item) => item.project_id === projectId);
-    const hasFinal = projectItems.some((item) => item.type === "final_movie" || item.type === "video_project");
-    const shotCount = projectItems.filter((item) => item.type === "video_shot").length;
-    if (!hasFinal && shotCount > 0) {
-      return { projectId, shotCount, title: projectItems[0]?.project_title ?? projectId };
-    }
-  }
-  return null;
 }
 
 function isFinalGalleryItem(item: GalleryItem) {
