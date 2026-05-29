@@ -300,6 +300,7 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
                 seconds=chunk.duration,
                 seed=1234 + abs(hash(chunk_id)) % 100000,
                 preset="preview",
+                video_only=True,
             )
         except ComfyAdapterError as exc:
             failure_path = out_dir / "video.comfy_failed.txt"
@@ -472,7 +473,14 @@ def render_comfy_ltx_shot(
         f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "
         "Cinematic realistic video, coherent motion, natural lighting, no color bars, no test pattern."
     )
-    render_ltx_video(text=prompt, destination=raw_path, seconds=source_seconds, seed=1234 + abs(hash(shot_id)) % 100000, preset=preset)
+    render_ltx_video(
+        text=prompt,
+        destination=raw_path,
+        seconds=source_seconds,
+        seed=1234 + abs(hash(shot_id)) % 100000,
+        preset=preset,
+        video_only=True,
+    )
     if _ffmpeg_available() and shot.duration > source_seconds and raw_path.exists():
         ratio = shot.duration / source_seconds
         result = subprocess.run(

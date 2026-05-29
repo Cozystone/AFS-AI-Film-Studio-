@@ -147,6 +147,7 @@ def build_ltx_api_prompt(
     seconds: float = 3.0,
     base_url: str = DEFAULT_COMFY_URL,
     preset: str = "preview",
+    video_only: bool = True,
 ) -> dict[str, Any]:
     profiles = {
         "turbo": {"width": 320, "height": 192, "fps": 16, "max_frames": 33},
@@ -162,7 +163,7 @@ def build_ltx_api_prompt(
     frames = max(25, min(int(profile["max_frames"]), int(seconds * fps)))
     width = int(profile["width"])
     height = int(profile["height"])
-    return {
+    prompt = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"}},
         "2": {
             "class_type": "LoraLoaderModelOnly",
@@ -228,6 +229,13 @@ def build_ltx_api_prompt(
         "20": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["13", 0]}},
         "21": {"class_type": "LTXVAudioVAEDecode", "inputs": {"audio_vae": ["17", 0], "samples": ["20", 1]}},
     }
+    if video_only:
+        prompt["10"]["inputs"]["latent"] = ["7", 0]
+        prompt["13"]["inputs"]["latent_image"] = ["7", 0]
+        prompt["14"]["inputs"]["latents"] = ["13", 0]
+        for node_id in ("17", "18", "19", "20", "21"):
+            prompt.pop(node_id, None)
+    return prompt
 
 
 def _history_for_prompt(base_url: str, prompt_id: str) -> dict[str, Any] | None:
@@ -265,13 +273,20 @@ def render_ltx_video(
     seed: int | None = None,
     base_url: str = DEFAULT_COMFY_URL,
     preset: str = "preview",
+    video_only: bool = True,
 ) -> Path:
     if not comfy_available(base_url):
         raise ComfyAdapterError(f"ComfyUI is not available at {base_url}")
     seed = seed if seed is not None else int(time.time()) % 1_000_000_000
     prefix = f"AFS/{destination.stem}_{uuid.uuid4().hex[:8]}"
-    prompt = build_ltx_api_prompt(text=text, prefix=prefix, seed=seed, seconds=seconds, base_url=base_url, preset=preset)
-    result = _post_json(f"{base_url}/prompt", {"prompt": prompt, "client_id": f"afs-{uuid.uuid4().hex}"}, timeout=30)
+    prompt = build_ltx_api_prompt(text=text, prefix=prefix, seed=seed, seconds=seconds, base_url=base_url, preset=preset, video_only=video_only)
+    try:
+        result = _post_json(f"{base_url}/prompt", {"prompt": prompt, "client_id": f"afs-{uuid.uuid4().hex}"}, timeout=30)
+    except ComfyAdapterError:
+        if not video_only:
+            raise
+        prompt = build_ltx_api_prompt(text=text, prefix=prefix, seed=seed, seconds=seconds, base_url=base_url, preset=preset, video_only=False)
+        result = _post_json(f"{base_url}/prompt", {"prompt": prompt, "client_id": f"afs-{uuid.uuid4().hex}"}, timeout=30)
     prompt_id = result["prompt_id"]
 
     deadline = time.time() + 1800
