@@ -127,12 +127,15 @@ const qualityOptions = [
   { label: "High - approved shots", value: "high" },
   { label: "Ultra - master only", value: "ultra" },
 ];
+const exampleScript =
+  "예: 버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.";
+const exampleTitle = "예: Last Tape";
 
 const copy = {
   ko: {
     appName: "AFS",
     subtitle: "텍스트를 넣으면 하나의 영화 프리뷰로 조립합니다.",
-    make: "만들기",
+    make: "새 영상",
     result: "결과",
     title: "제목",
     script: "시나리오",
@@ -195,7 +198,7 @@ const copy = {
   en: {
     appName: "AFS",
     subtitle: "Turn text into one stitched movie preview.",
-    make: "Make",
+    make: "New video",
     result: "Result",
     title: "Title",
     script: "Script",
@@ -268,10 +271,8 @@ export default function Home() {
   const t = copy[language];
   const [orchestratorUrl, setOrchestratorUrl] = useState(initialOrchestratorUrl);
   const [orchestratorInput, setOrchestratorInput] = useState(initialOrchestratorUrl);
-  const [title, setTitle] = useState("Last Tape");
-  const [scriptPrompt, setScriptPrompt] = useState(
-    "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.",
-  );
+  const [title, setTitle] = useState("");
+  const [scriptPrompt, setScriptPrompt] = useState("");
   const [styleHint, setStyleHint] = useState("early 2000s camcorder, lo-fi indie film");
   const [audioHint, setAudioHint] = useState("fluorescent buzz, tape hiss, distant wind");
   const [movieSource, setMovieSource] = useState("auto_storyboard");
@@ -439,6 +440,44 @@ export default function Home() {
     else window.localStorage.removeItem("afs.orchestratorUrl");
   }
 
+  function resetWorkspace() {
+    setTitle("");
+    setScriptPrompt("");
+    setStyleHint("early 2000s camcorder, lo-fi indie film");
+    setAudioHint("fluorescent buzz, tape hiss, distant wind");
+    setMovieSource("auto_storyboard");
+    setStoryboardScenes(6);
+    setKeepContinuity(true);
+    setCheckpoint(checkpoints[0]);
+    setLora(loras[0]);
+    setTextEncoder(textEncoders[0]);
+    setOutputQuality("fast");
+    setAspectRatio("16:9");
+    setClipLength(3);
+    setRenderStyle("cinematic");
+    setSeed("");
+    setIncludeAudio(true);
+    setProject(null);
+    setGraph(null);
+    setMoviePreviewUrl(null);
+    setSelectedGalleryItem(null);
+    setStatus(t.ready);
+    setSmoothProgressPercent(0);
+    setProgressClock(0);
+    setProductionProgress({
+      active: false,
+      completed: false,
+      label: t.ready,
+      basePercent: 0,
+      segmentPercent: 0,
+      taskStartedAt: 0,
+      taskEstimateSec: 1,
+      startedAt: 0,
+      totalEstimateSec: 1,
+    });
+    document.getElementById("make")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function createMovieFromText() {
     setBusy(true);
     setMoviePreviewUrl(null);
@@ -472,8 +511,8 @@ export default function Home() {
       const created = await request<{ project_id: string }>("/api/projects", {
         method: "POST",
         body: JSON.stringify({
-          title,
-          script_prompt: scriptPrompt,
+          title: title.trim() || "Untitled Film",
+          script_prompt: scriptPrompt.trim(),
           duration: storyboardScenes * clipLength,
           aspect_ratio: aspectRatio,
           style_hint: `${styleHint}, ${renderStyle}, ${outputQuality}, source=${movieSource}, continuity=${keepContinuity}`,
@@ -566,9 +605,9 @@ function selectFinalOutput(item: GalleryItem) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800" href="#make">
+            <button className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800" type="button" onClick={resetWorkspace}>
               {t.make}
-            </a>
+            </button>
             <a className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800" href="#result">
               {t.result}
             </a>
@@ -601,7 +640,8 @@ function selectFinalOutput(item: GalleryItem) {
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  className="mt-1 h-11 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
+                  placeholder={exampleTitle}
+                  className="mt-1 h-11 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-400"
                 />
               </label>
               <label className="text-sm text-slate-300">
@@ -609,14 +649,15 @@ function selectFinalOutput(item: GalleryItem) {
                 <textarea
                   value={scriptPrompt}
                   onChange={(event) => setScriptPrompt(event.target.value)}
+                  placeholder={exampleScript}
                   rows={9}
-                  className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-3 text-slate-100 outline-none focus:border-emerald-400"
+                  className="mt-1 w-full resize-none rounded-md border border-slate-700 bg-[#0b0d10] px-3 py-3 text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-400"
                 />
               </label>
               <MovieProductionProgress snapshot={displayProgressSnapshot} />
               <button
                 className="mt-1 flex h-13 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-base font-semibold text-slate-950 disabled:opacity-60"
-                disabled={busy}
+                disabled={busy || !scriptPrompt.trim()}
                 type="button"
                 onClick={createMovieFromText}
               >
