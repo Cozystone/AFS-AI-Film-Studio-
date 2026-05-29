@@ -101,8 +101,18 @@ type GalleryItem = {
 type Language = "ko" | "en";
 
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
-const samplePrompt =
+void
   "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.";
+
+const checkpoints = ["ltx-2.3-22b-dev-fp8.safetensors", "wan2.1_t2v_1.3B_fp16.safetensors", "mock"];
+const loras = ["ltx-2.3-22b-distilled-lora-384.safetensors", "none"];
+const textEncoders = ["gemma_3_12B_it_fp4_mixed.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"];
+const qualityOptions = [
+  { label: "Fast - 384px preview", value: "fast" },
+  { label: "Balanced - 720p export", value: "balanced" },
+  { label: "High - approved shots", value: "high" },
+  { label: "Ultra - master only", value: "ultra" },
+];
 
 const copy = {
   ko: {
@@ -245,9 +255,23 @@ export default function Home() {
   const [orchestratorUrl, setOrchestratorUrl] = useState(initialOrchestratorUrl);
   const [orchestratorInput, setOrchestratorInput] = useState(initialOrchestratorUrl);
   const [title, setTitle] = useState("Last Tape");
-  const [scriptPrompt, setScriptPrompt] = useState(samplePrompt);
+  const [scriptPrompt, setScriptPrompt] = useState(
+    "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.",
+  );
   const [styleHint, setStyleHint] = useState("early 2000s camcorder, lo-fi indie film");
   const [audioHint, setAudioHint] = useState("fluorescent buzz, tape hiss, distant wind");
+  const [movieSource, setMovieSource] = useState("auto_storyboard");
+  const [storyboardScenes, setStoryboardScenes] = useState(6);
+  const [keepContinuity, setKeepContinuity] = useState(true);
+  const [checkpoint, setCheckpoint] = useState(checkpoints[0]);
+  const [lora, setLora] = useState(loras[0]);
+  const [textEncoder, setTextEncoder] = useState(textEncoders[0]);
+  const [outputQuality, setOutputQuality] = useState("balanced");
+  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [clipLength, setClipLength] = useState(5);
+  const [renderStyle, setRenderStyle] = useState("cinematic");
+  const [seed, setSeed] = useState("");
+  const [includeAudio, setIncludeAudio] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [graph, setGraph] = useState<CineGraph | null>(null);
   const [moviePreviewUrl, setMoviePreviewUrl] = useState<string | null>(null);
@@ -273,11 +297,29 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         ...init,
       });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const text = await response.text();
+        if (text.includes("Cloudflare Tunnel error") || text.includes("<!DOCTYPE html") || text.includes("<html")) {
+          throw new Error("Orchestrator tunnel error. Restart the AFS tunnel and redeploy the web URL.");
+        }
+        throw new Error(text.slice(0, 500));
+      }
       return response.json();
     },
     [orchestratorUrl],
   );
+
+  useEffect(() => {
+    if (configuredApiBase) {
+      const normalized = configuredApiBase.replace(/\/$/, "");
+      const timer = window.setTimeout(() => {
+        setOrchestratorUrl(normalized);
+        setOrchestratorInput(normalized);
+        window.localStorage.setItem("afs.orchestratorUrl", normalized);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, []);
 
   const loadGallery = useCallback(async () => {
     if (!orchestratorUrl) return;
@@ -359,9 +401,9 @@ export default function Home() {
         body: JSON.stringify({
           title,
           script_prompt: scriptPrompt,
-          duration: 30,
-          aspect_ratio: "16:9",
-          style_hint: styleHint,
+          duration: storyboardScenes * clipLength,
+          aspect_ratio: aspectRatio,
+          style_hint: `${styleHint}, ${renderStyle}, ${outputQuality}, source=${movieSource}, continuity=${keepContinuity}`,
           audio_hint: audioHint,
         }),
       });
@@ -385,22 +427,32 @@ export default function Home() {
       for (const shot of planned.shots) {
         await request(`/api/shots/${shot.shot_id}/render`, {
           method: "POST",
-          body: JSON.stringify({ preset: "preview", renderer: "comfy_ltx", audio: true }),
+          body: JSON.stringify({
+            preset: outputQuality,
+            renderer: checkpoint === "mock" ? "mock" : "comfy_ltx",
+            audio: includeAudio,
+            checkpoint,
+            lora,
+            text_encoder: textEncoder,
+            seed: seed.trim() || null,
+          }),
         });
       }
 
-      setStatus(t.audio);
-      for (const shot of planned.shots) {
-        await request(`/api/shots/${shot.shot_id}/audio/render`, {
-          method: "POST",
-          body: JSON.stringify({ layers: ["foley", "ambience", "music"], adapter: "mock_audio" }),
-        });
+      if (includeAudio) {
+        setStatus(t.audio);
+        for (const shot of planned.shots) {
+          await request(`/api/shots/${shot.shot_id}/audio/render`, {
+            method: "POST",
+            body: JSON.stringify({ layers: ["foley", "ambience", "music"], adapter: "mock_audio" }),
+          });
+        }
       }
 
       setStatus(t.exporting);
       const exported = await request<{ media_url: string | null }>(`/api/projects/${created.project_id}/export`, {
         method: "POST",
-        body: JSON.stringify({ format: "mp4", resolution: "1280x720", include_audio: true }),
+        body: JSON.stringify({ format: "mp4", resolution: "1280x720", include_audio: includeAudio }),
       });
 
       if (exported.media_url) {
@@ -438,7 +490,7 @@ export default function Home() {
     }
   }
 
-  function selectFinalOutput(item: GalleryItem) {
+function selectFinalOutput(item: GalleryItem) {
     setSelectedGalleryItem(item);
     if (isFinalGalleryItem(item)) {
       setMoviePreviewUrl(`${orchestratorUrl}${item.media_url}`);
@@ -448,7 +500,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#0b0d10] text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-800 bg-[#0b0d10]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-md bg-emerald-400 text-slate-950">
               <Clapperboard size={22} />
@@ -485,7 +537,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1700px] gap-4 px-4 py-5 xl:grid-cols-[0.58fr_1.08fr_360px]">
+      <div className="mx-auto grid max-w-[1600px] gap-4 px-5 py-5 xl:grid-cols-[520px_minmax(0,720px)_340px]">
         <section id="make" className="space-y-4">
           <Panel title={t.inputTitle} description={t.inputBody} icon={<Sparkles size={18} className="text-emerald-300" />}>
             <div className="grid gap-3">
@@ -522,6 +574,84 @@ export default function Home() {
                   className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
                 />
               </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <SelectField label="Movie source" value={movieSource} onChange={setMovieSource}>
+                  <option value="auto_storyboard">Auto storyboard images</option>
+                  <option value="text_only">Text only</option>
+                  <option value="reference_locked">Reference locked</option>
+                </SelectField>
+                <SelectField label="Storyboard scenes" value={String(storyboardScenes)} onChange={(value) => setStoryboardScenes(Number(value))}>
+                  {[3, 4, 5, 6, 8, 10].map((count) => (
+                    <option key={count} value={count}>
+                      {count} scenes
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField label="Checkpoint model" value={checkpoint} onChange={setCheckpoint}>
+                  {checkpoints.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField label="Output quality" value={outputQuality} onChange={setOutputQuality}>
+                  {qualityOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField label="LoRA" value={lora} onChange={setLora}>
+                  {loras.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField label="Text encoder" value={textEncoder} onChange={setTextEncoder}>
+                  {textEncoders.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField label="Aspect" value={aspectRatio} onChange={setAspectRatio}>
+                  <option value="16:9">16:9</option>
+                  <option value="9:16">9:16</option>
+                  <option value="1:1">1:1</option>
+                </SelectField>
+                <SelectField label="Length per cut" value={String(clipLength)} onChange={(value) => setClipLength(Number(value))}>
+                  <option value="2">2 seconds</option>
+                  <option value="3">3 seconds</option>
+                  <option value="5">5 seconds</option>
+                  <option value="8">8 seconds</option>
+                </SelectField>
+                <SelectField label="Style" value={renderStyle} onChange={setRenderStyle}>
+                  <option value="cinematic">Cinematic</option>
+                  <option value="camcorder">Camcorder</option>
+                  <option value="documentary">Documentary</option>
+                  <option value="commercial">Commercial</option>
+                </SelectField>
+                <label className="text-sm text-slate-300">
+                  Seed
+                  <input
+                    value={seed}
+                    onChange={(event) => setSeed(event.target.value)}
+                    placeholder="Empty = random"
+                    className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3 text-sm text-slate-300">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={keepContinuity} onChange={(event) => setKeepContinuity(event.target.checked)} />
+                  Keep character continuity
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={includeAudio} onChange={(event) => setIncludeAudio(event.target.checked)} />
+                  Include audio
+                </label>
+              </div>
               <button
                 className="mt-1 flex h-13 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-base font-semibold text-slate-950 disabled:opacity-60"
                 disabled={busy}
@@ -579,7 +709,7 @@ export default function Home() {
         </aside>
       </div>
 
-      <section className="mx-auto max-w-[1500px] px-4 pb-8">
+      <section className="mx-auto max-w-[1600px] px-5 pb-8">
         <button
           className="flex h-11 w-full items-center justify-between rounded-md border border-slate-800 bg-[#11151b] px-4 text-left text-sm font-medium text-slate-200"
           type="button"
@@ -633,6 +763,31 @@ export default function Home() {
         />
       ) : null}
     </main>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label className="text-sm text-slate-300">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#0b0d10] px-3 text-slate-100 outline-none focus:border-emerald-400"
+      >
+        {children}
+      </select>
+    </label>
   );
 }
 
