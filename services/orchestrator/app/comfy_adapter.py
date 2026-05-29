@@ -299,6 +299,19 @@ def render_ltx_video(
     while time.time() < deadline:
         history = _history_for_prompt(base_url, prompt_id)
         if history:
-            return _copy_comfy_output(base_url, history, destination)
+            try:
+                return _copy_comfy_output(base_url, history, destination)
+            except ComfyAdapterError:
+                if not video_only:
+                    raise
+                return render_ltx_video(
+                    text=text,
+                    destination=destination,
+                    seconds=seconds,
+                    seed=seed,
+                    base_url=base_url,
+                    preset=preset,
+                    video_only=False,
+                )
         time.sleep(2)
     raise ComfyAdapterError("ComfyUI render timed out")

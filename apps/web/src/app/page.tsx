@@ -1430,15 +1430,17 @@ async function waitForMovieRender({
   setProgressClock: (value: number) => void;
   orchestratorUrl: string;
 }) {
+  let highestPercent = 7;
   while (true) {
     const job = await request<Job>(`/api/jobs/${jobId}`);
-    const backendPercent = Math.max(7, Math.min(99, Math.round(job.progress * 100)));
+    const backendPercent = Math.max(7, Math.min(99, Math.round(7 + job.progress * 88)));
+    highestPercent = Math.max(highestPercent, backendPercent);
     const label = describeMovieJob(job);
     setProductionProgress({
       active: job.status !== "succeeded" && job.status !== "failed" && job.status !== "cancelled",
       completed: job.status === "succeeded",
       label,
-      basePercent: job.status === "succeeded" ? 100 : backendPercent,
+      basePercent: job.status === "succeeded" ? 100 : highestPercent,
       segmentPercent: 0,
       taskStartedAt: Date.now(),
       taskEstimateSec: 1,
@@ -1523,10 +1525,11 @@ function estimateMovieSeconds({
 
 function getProductionProgressSnapshot(progress: ProductionProgress, nowMs: number) {
   if (!progress.active && !progress.completed) {
+    const percent = Math.max(0, Math.min(99, Math.floor(progress.basePercent)));
     return {
-      percent: 0,
-      label: "대기 중",
-      elapsedSec: 0,
+      percent,
+      label: progress.label || "대기 중",
+      elapsedSec: progress.startedAt ? Math.max(0, (nowMs - progress.startedAt) / 1000) : 0,
       remainingSec: progress.totalEstimateSec,
       totalEstimateSec: progress.totalEstimateSec,
       active: false,
