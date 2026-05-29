@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   Activity,
@@ -115,7 +115,7 @@ type Language = "ko" | "en";
 
 const configuredApiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "/api/orchestrator";
 void
-  "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.";
+  "踰꾨젮吏?二쇱쑀?뚯뿉????泥?냼?꾩씠 ?≪? 罹좎퐫?붾줈 ?쒕줈瑜?李띾떎媛, 留덉?留됱뿉 ?щ씪吏?移쒓뎄???곸긽??諛쒓껄?섎뒗 30珥덉쭨由??낅┰?곹솕???곸긽.";
 
 const checkpoints = ["ltx-2.3-22b-dev-fp8.safetensors", "wan2.1_t2v_1.3B_fp16.safetensors", "mock"];
 const loras = ["ltx-2.3-22b-distilled-lora-384.safetensors", "none"];
@@ -141,9 +141,9 @@ const copy = {
     making: "영화 만드는 중",
     ready: "준비됨",
     inputTitle: "텍스트 투 무비",
-    inputBody: "시나리오만 넣고 실행하세요. AFS가 내부적으로 컷과 구간을 나누지만, 화면에는 최종 조립된 영화만 보여줍니다.",
+    inputBody: "시나리오만 넣고 실행하세요. AFS가 내부적으로 컷과 구간을 나누지만, 화면에는 최종 조립된 영화와 제작 타임라인을 보여줍니다.",
     previewTitle: "영화 프리뷰",
-    previewBody: "중간 1~2초 조각은 표시하지 않습니다. 모든 컷이 완성되고 합쳐진 뒤 한 번만 나타납니다.",
+    previewBody: "중간 조각은 프리뷰 아래 타임라인에 표시하고, 모든 컷이 완성되면 통합 영상이 한 번에 나타납니다.",
     noPreview: "완성된 영화 프리뷰가 여기에 표시됩니다.",
     progress: "진행 상황",
     pcStatus: "PC 상태",
@@ -156,9 +156,9 @@ const copy = {
     projectJson: "Project JSON",
     orchestratorUrl: "Orchestrator URL",
     save: "저장",
-    proxyHint: "배포 환경에서는 자동 프록시를 사용합니다. 직접 테스트할 때만 바꾸세요.",
+    proxyHint: "諛고룷 ?섍꼍?먯꽌???먮룞 ?꾨줉?쒕? ?ъ슜?⑸땲?? 吏곸젒 ?뚯뒪?명븷 ?뚮쭔 諛붽씀?몄슂.",
     offline: "오케스트레이터 연결 안 됨",
-    noJobs: "아직 작업이 없습니다.",
+    noJobs: "?꾩쭅 ?묒뾽???놁뒿?덈떎.",
     cpu: "CPU",
     gpu: "GPU",
     memory: "메모리",
@@ -179,16 +179,16 @@ const copy = {
     latestOutputs: "생성된 영상",
     noOutputs: "아직 생성된 결과물이 없습니다.",
     noFinalOutputs: "아직 통합 영상이 없습니다.",
-    editTimeline: "편집 타임라인",
-    editTimelineHint: "생성된 샷 조각은 여기에서 순서대로 확인합니다.",
+    editTimeline: "제작 타임라인",
+    editTimelineHint: "계획된 컷과 생성된 컷을 순서대로 확인합니다.",
     sceneTrack: "컷",
     bridgeTrack: "연결",
     bridgeClip: "연결 영상",
     open: "열기",
     finalMovie: "최종 영화",
-    shotPreview: "샷 프리뷰",
+    shotPreview: "컷 프리뷰",
     buildPreview: "통합 프리뷰 만들기",
-    partialPreviewHint: "완성된 샷들을 하나의 프리뷰로 묶습니다.",
+    partialPreviewHint: "완성된 컷들을 하나의 프리뷰로 묶습니다.",
     close: "닫기",
   },
   en: {
@@ -269,7 +269,7 @@ export default function Home() {
   const [orchestratorInput, setOrchestratorInput] = useState(initialOrchestratorUrl);
   const [title, setTitle] = useState("Last Tape");
   const [scriptPrompt, setScriptPrompt] = useState(
-    "버려진 주유소에서 두 청소년이 낡은 캠코더로 서로를 찍다가, 마지막에 사라진 친구의 영상을 발견하는 30초짜리 독립영화풍 영상.",
+    "踰꾨젮吏?二쇱쑀?뚯뿉????泥?냼?꾩씠 ?≪? 罹좎퐫?붾줈 ?쒕줈瑜?李띾떎媛, 留덉?留됱뿉 ?щ씪吏?移쒓뎄???곸긽??諛쒓껄?섎뒗 30珥덉쭨由??낅┰?곹솕???곸긽.",
   );
   const [styleHint, setStyleHint] = useState("early 2000s camcorder, lo-fi indie film");
   const [audioHint, setAudioHint] = useState("fluorescent buzz, tape hiss, distant wind");
@@ -279,9 +279,9 @@ export default function Home() {
   const [checkpoint, setCheckpoint] = useState(checkpoints[0]);
   const [lora, setLora] = useState(loras[0]);
   const [textEncoder, setTextEncoder] = useState(textEncoders[0]);
-  const [outputQuality, setOutputQuality] = useState("balanced");
+  const [outputQuality, setOutputQuality] = useState("fast");
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [clipLength, setClipLength] = useState(5);
+  const [clipLength, setClipLength] = useState(3);
   const [renderStyle, setRenderStyle] = useState("cinematic");
   const [seed, setSeed] = useState("");
   const [includeAudio, setIncludeAudio] = useState(true);
@@ -401,12 +401,12 @@ export default function Home() {
 
   useEffect(() => {
     const initial = window.setTimeout(loadGallery, 0);
-    const interval = window.setInterval(loadGallery, 5000);
+    const interval = window.setInterval(loadGallery, productionProgress.active ? 1500 : 5000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(interval);
     };
-  }, [loadGallery]);
+  }, [loadGallery, productionProgress.active]);
 
   useEffect(() => {
     if (!productionProgress.active) return;
@@ -449,7 +449,7 @@ export default function Home() {
     };
     try {
       setStatus(t.creating);
-      setMovieTask("프로젝트 생성", 0, 2, 3);
+      setMovieTask("?꾨줈?앺듃 ?앹꽦", 0, 2, 3);
       const created = await request<{ project_id: string }>("/api/projects", {
         method: "POST",
         body: JSON.stringify({
@@ -466,7 +466,7 @@ export default function Home() {
       setProject(loaded);
 
       setStatus(t.planning);
-      setMovieTask("장면과 컷 설계", 2, 5, 6);
+      setMovieTask("?λ㈃怨?而??ㅺ퀎", 2, 5, 6);
       const planned = await request<CineGraph>(`/api/projects/${created.project_id}/plan`, { method: "POST" });
       setGraph(planned);
       totalEstimateSec = estimateMovieSeconds({
@@ -518,74 +518,6 @@ export default function Home() {
       setProgressClock(Date.now());
       return;
 
-      setStatus(t.keyframing);
-      const keyframeSegment = 8 / Math.max(planned.shots.length, 1);
-      for (const [index, shot] of planned.shots.entries()) {
-        setMovieTask(`키프레임 준비 ${index + 1}/${planned.shots.length}`, 7 + keyframeSegment * index, keyframeSegment, 2);
-        await request(`/api/shots/${shot.shot_id}/keyframes/generate`, {
-          method: "POST",
-          body: JSON.stringify({ slots: ["first", "middle", "last"], renderer: "mock" }),
-        });
-      }
-
-      setStatus(t.rendering);
-      const renderSegment = 70 / Math.max(planned.shots.length, 1);
-      const renderEstimate = estimateRenderSeconds({ checkpoint, outputQuality });
-      for (const [index, shot] of planned.shots.entries()) {
-        setMovieTask(`영상 렌더 ${index + 1}/${planned.shots.length}`, 15 + renderSegment * index, renderSegment, renderEstimate);
-        await request(`/api/shots/${shot.shot_id}/render`, {
-          method: "POST",
-          body: JSON.stringify({
-            preset: outputQuality,
-            renderer: checkpoint === "mock" ? "mock" : "comfy_ltx",
-            audio: includeAudio,
-            checkpoint,
-            lora,
-            text_encoder: textEncoder,
-            seed: seed.trim() || null,
-          }),
-        });
-      }
-
-      if (includeAudio) {
-        setStatus(t.audio);
-        const audioSegment = 10 / Math.max(planned.shots.length, 1);
-        for (const [index, shot] of planned.shots.entries()) {
-          setMovieTask(`오디오 레이어 ${index + 1}/${planned.shots.length}`, 85 + audioSegment * index, audioSegment, 3);
-          await request(`/api/shots/${shot.shot_id}/audio/render`, {
-            method: "POST",
-            body: JSON.stringify({ layers: ["foley", "ambience", "music"], adapter: "mock_audio" }),
-          });
-        }
-      }
-
-      setStatus(t.exporting);
-      setMovieTask("통합 영상 제작 / 업스케일", includeAudio ? 95 : 85, includeAudio ? 5 : 15, 10 + planned.shots.length);
-      const exported = await request<{ media_url: string | null }>(`/api/projects/${created.project_id}/export`, {
-        method: "POST",
-        body: JSON.stringify({ format: "mp4", resolution: "1280x720", include_audio: includeAudio }),
-      });
-
-      if (exported.media_url) {
-        setMoviePreviewUrl(`${orchestratorUrl}${exported.media_url}`);
-      } else {
-        const preview = await request<{ media_url: string }>(`/api/projects/${created.project_id}/preview`);
-        setMoviePreviewUrl(`${orchestratorUrl}${preview.media_url}`);
-      }
-      await loadGallery();
-      setStatus(t.complete);
-      setProductionProgress({
-        active: false,
-        completed: true,
-        label: "완료",
-        basePercent: 100,
-        segmentPercent: 0,
-        taskStartedAt: Date.now(),
-        taskEstimateSec: 1,
-        startedAt,
-        totalEstimateSec: Math.max(1, (Date.now() - startedAt) / 1000),
-      });
-      setProgressClock(Date.now());
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Request failed");
       setProductionProgress((current) => ({ ...current, active: false, label: "중단됨" }));
@@ -717,7 +649,7 @@ function selectFinalOutput(item: GalleryItem) {
                 </div>
               )}
             </div>
-            <ShotTimeline items={timelineItems} t={t} orchestratorUrl={orchestratorUrl} />
+            <ShotTimeline items={timelineItems} graph={graph} snapshot={progressSnapshot} t={t} orchestratorUrl={orchestratorUrl} />
             <RenderSettingsPanel
               styleHint={styleHint}
               setStyleHint={setStyleHint}
@@ -869,7 +801,7 @@ function MovieProductionProgress({
     <div className="rounded-md border border-slate-800 bg-[#080b0f] p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-100">통합 영화 제작 진행</p>
+          <p className="text-sm font-semibold text-slate-100">?듯빀 ?곹솕 ?쒖옉 吏꾪뻾</p>
           <p className="mt-0.5 text-xs text-slate-500">{snapshot.label}</p>
         </div>
         <span className="font-mono text-lg font-semibold text-emerald-300">{snapshot.percent}%</span>
@@ -879,11 +811,11 @@ function MovieProductionProgress({
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500">
         <span>경과 {formatDuration(snapshot.elapsedSec)}</span>
-        <span>남은 시간 {snapshot.completed ? "0분" : formatDuration(snapshot.remainingSec)}</span>
+        <span>남은 시간 {snapshot.completed ? "0초" : formatDuration(snapshot.remainingSec)}</span>
         <span>예상 총 {formatDuration(snapshot.totalEstimateSec)}</span>
       </div>
       <p className="mt-2 text-xs leading-5 text-slate-600">
-        예측: 기획 7%, 키프레임 8%, 영상 렌더 70%, 오디오 10%, 통합/업스케일 5% 가중치와 컷 수, 품질 프리셋을 기준으로 계산합니다.
+        예측: 기획 7%, 키프레임 8%, 영상 렌더 70%, 오디오 10%, 통합 5% 가중치와 컷별 완료율을 기준으로 계산합니다.
       </p>
     </div>
   );
@@ -951,21 +883,19 @@ function RenderSettingsPanel({
   return (
     <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-100">영상 스타일 / 렌더 설정</h3>
-        <p className="text-xs text-slate-500">프리뷰 아래에서 컷 구성과 렌더 옵션을 조정합니다.</p>
+        <h3 className="text-sm font-semibold text-slate-100">?곸긽 ?ㅽ???/ ?뚮뜑 ?ㅼ젙</h3>
+        <p className="text-xs text-slate-500">?꾨━酉??꾨옒?먯꽌 而?援ъ꽦怨??뚮뜑 ?듭뀡??議곗젙?⑸땲??</p>
       </div>
       <div className="grid gap-3">
         <label className="text-sm text-slate-300">
-          영상 스타일
-          <input
+          ?곸긽 ?ㅽ???          <input
             value={styleHint}
             onChange={(event) => setStyleHint(event.target.value)}
             className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
           />
         </label>
         <label className="text-sm text-slate-300">
-          소리 스타일
-          <input
+          ?뚮━ ?ㅽ???          <input
             value={audioHint}
             onChange={(event) => setAudioHint(event.target.value)}
             className="mt-1 h-10 w-full rounded-md border border-slate-700 bg-[#080b0f] px-3 text-slate-100 outline-none focus:border-emerald-400"
@@ -1174,8 +1104,21 @@ function GalleryCard({
   );
 }
 
-function ShotTimeline({ items, t, orchestratorUrl }: { items: GalleryItem[]; t: Record<string, string>; orchestratorUrl: string }) {
-  const transitions = buildTransitionItems(items);
+function ShotTimeline({
+  items,
+  graph,
+  snapshot,
+  t,
+  orchestratorUrl,
+}: {
+  items: GalleryItem[];
+  graph: CineGraph | null;
+  snapshot: ReturnType<typeof getProductionProgressSnapshot>;
+  t: Record<string, string>;
+  orchestratorUrl: string;
+}) {
+  const clips = buildTimelineClips(graph, items, snapshot.percent);
+  const transitions = buildTransitionItems(clips);
 
   return (
     <div className="mt-4 rounded-md border border-slate-800 bg-[#0b0d10] p-3">
@@ -1184,30 +1127,43 @@ function ShotTimeline({ items, t, orchestratorUrl }: { items: GalleryItem[]; t: 
           <h3 className="text-sm font-semibold text-slate-100">{t.editTimeline}</h3>
           <p className="text-xs text-slate-500">{t.editTimelineHint}</p>
         </div>
-        <span className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-400">{items.length}</span>
+        <span className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-400">
+          {clips.filter((clip) => clip.status === "done").length}/{clips.length}
+        </span>
       </div>
-      {items.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
-      {items.length > 0 ? (
+      {clips.length === 0 ? <EmptyState text={t.noOutputs} /> : null}
+      {clips.length > 0 ? (
         <div className="overflow-x-auto rounded-md border border-slate-800 bg-[#0d1117]">
           <div className="min-w-max">
-            <div className="grid border-b border-slate-800" style={{ gridTemplateColumns: `44px repeat(${items.length}, 176px)` }}>
+            <div className="grid border-b border-slate-800" style={{ gridTemplateColumns: `44px repeat(${clips.length}, 176px)` }}>
               <div className="grid place-items-center border-r border-slate-800 bg-[#11151b] text-xs text-slate-500">{t.sceneTrack}</div>
-              {items.map((item, index) => (
-                <article key={`${item.project_id}-${item.artifact_id}-${item.label}`} className="border-r border-slate-800 p-2">
-                  <div className="overflow-hidden rounded-md border border-emerald-500/30 bg-slate-900">
-                    <video className="aspect-video w-full bg-black object-cover" src={`${orchestratorUrl}${item.media_url}`} muted preload="metadata" />
+              {clips.map((clip, index) => (
+                <article key={clip.id} className="border-r border-slate-800 p-2">
+                  <div className={`overflow-hidden rounded-md border bg-slate-900 ${clip.status === "done" ? "border-emerald-500/40" : clip.status === "rendering" ? "border-amber-400/60" : "border-slate-700"}`}>
+                    {clip.mediaUrl ? (
+                      <video className="aspect-video w-full bg-black object-cover" src={`${orchestratorUrl}${clip.mediaUrl}`} muted preload="metadata" />
+                    ) : (
+                      <div className="grid aspect-video place-items-center bg-[#111827] p-3 text-center">
+                        <div className="w-full">
+                          <p className="text-xs font-medium text-slate-300">{clip.statusLabel}</p>
+                          <div className="mt-3 h-1.5 overflow-hidden rounded bg-slate-800">
+                            <div className="h-full rounded bg-amber-300 transition-[width]" style={{ width: `${clip.progress}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between gap-2 px-2 py-1.5">
                       <span className="font-mono text-xs text-emerald-300">{String(index + 1).padStart(2, "0")}</span>
-                      <span className="truncate text-xs text-slate-200">{item.label}</span>
+                      <span className="truncate text-xs text-slate-200">{clip.label}</span>
                     </div>
                   </div>
                 </article>
               ))}
             </div>
-            <div className="grid" style={{ gridTemplateColumns: `44px repeat(${items.length}, 176px)` }}>
+            <div className="grid" style={{ gridTemplateColumns: `44px repeat(${clips.length}, 176px)` }}>
               <div className="grid place-items-center border-r border-slate-800 bg-[#11151b] text-xs text-slate-500">{t.bridgeTrack}</div>
-              {items.map((item, index) => (
-                <div key={`${item.project_id}-${item.artifact_id}-bridge`} className="border-r border-slate-800 p-2">
+              {clips.map((clip, index) => (
+                <div key={`${clip.id}-bridge`} className="border-r border-slate-800 p-2">
                   {transitions[index] ? (
                     <div className="grid aspect-video place-items-end rounded-md border border-slate-700 bg-gradient-to-b from-[#121a24] to-[#0b0d10] p-2">
                       <div className="w-full">
@@ -1228,7 +1184,98 @@ function ShotTimeline({ items, t, orchestratorUrl }: { items: GalleryItem[]; t: 
   );
 }
 
-function buildTransitionItems(items: GalleryItem[]) {
+type TimelineClip = {
+  id: string;
+  label: string;
+  mediaUrl: string | null;
+  status: "queued" | "keyframing" | "rendering" | "mixing" | "done";
+  statusLabel: string;
+  progress: number;
+};
+
+function buildTimelineClips(graph: CineGraph | null, items: GalleryItem[], percent: number): TimelineClip[] {
+  const shotItems = items.filter((item) => item.type === "video_shot");
+  if (!graph || graph.shots.length === 0) {
+    return shotItems.map((item) => ({
+      id: item.artifact_id,
+      label: item.label,
+      mediaUrl: item.media_url,
+      status: "done",
+      statusLabel: "완료",
+      progress: 100,
+    }));
+  }
+
+  const renderStart = 15;
+  const renderEnd = 85;
+  const renderPercent = Math.max(0, Math.min(1, (percent - renderStart) / (renderEnd - renderStart)));
+  const activeIndex = Math.min(graph.shots.length - 1, Math.floor(renderPercent * graph.shots.length));
+
+  return graph.shots.map((shot, index) => {
+    const item = shotItems.find((candidate) => candidate.label === shot.shot_id || candidate.label.includes(shot.shot_id));
+    if (item) {
+      return {
+        id: shot.shot_id,
+        label: shot.shot_id,
+        mediaUrl: item.media_url,
+        status: "done",
+        statusLabel: "완료",
+        progress: 100,
+      } satisfies TimelineClip;
+    }
+    if (percent < renderStart) {
+      return {
+        id: shot.shot_id,
+        label: shot.shot_id,
+        mediaUrl: null,
+        status: "keyframing",
+        statusLabel: "컷 설계 / 키프레임",
+        progress: Math.max(10, Math.min(90, percent * 6)),
+      } satisfies TimelineClip;
+    }
+    if (percent >= renderEnd) {
+      return {
+        id: shot.shot_id,
+        label: shot.shot_id,
+        mediaUrl: null,
+        status: "mixing",
+        statusLabel: "통합 대기",
+        progress: 92,
+      } satisfies TimelineClip;
+    }
+    if (index < activeIndex) {
+      return {
+        id: shot.shot_id,
+        label: shot.shot_id,
+        mediaUrl: null,
+        status: "mixing",
+        statusLabel: "영상 저장 확인 중",
+        progress: 88,
+      } satisfies TimelineClip;
+    }
+    if (index === activeIndex) {
+      const localProgress = Math.round(((renderPercent * graph.shots.length) % 1) * 100);
+      return {
+        id: shot.shot_id,
+        label: shot.shot_id,
+        mediaUrl: null,
+        status: "rendering",
+        statusLabel: "렌더링 중",
+        progress: Math.max(8, localProgress),
+      } satisfies TimelineClip;
+    }
+    return {
+      id: shot.shot_id,
+      label: shot.shot_id,
+      mediaUrl: null,
+      status: "queued",
+      statusLabel: "대기",
+      progress: 0,
+    } satisfies TimelineClip;
+  });
+}
+
+function buildTransitionItems(items: { label: string }[]) {
   return items.map((item, index) => {
     const next = items[index + 1];
     if (!next) return null;
@@ -1467,6 +1514,7 @@ async function waitForMovieRender({
     if (job.status === "failed" || job.status === "cancelled") {
       throw new Error(job.error || `Render job ${job.status}`);
     }
+    await loadGallery();
     await sleep(2000);
   }
 }
@@ -1502,13 +1550,13 @@ function formatDuration(value: number) {
 
 function estimateRenderSeconds({ checkpoint, outputQuality }: { checkpoint: string; outputQuality: string }) {
   if (checkpoint === "mock") return 2;
-  const qualityMultiplier: Record<string, number> = {
-    fast: 0.8,
-    balanced: 1,
-    high: 1.45,
-    ultra: 2.1,
+  const qualityEstimate: Record<string, number> = {
+    fast: 75,
+    balanced: 125,
+    high: 160,
+    ultra: 210,
   };
-  return Math.round(135 * (qualityMultiplier[outputQuality] ?? 1));
+  return qualityEstimate[outputQuality] ?? 95;
 }
 
 function estimateMovieSeconds({

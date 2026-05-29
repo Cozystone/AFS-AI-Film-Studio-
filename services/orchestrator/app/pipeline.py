@@ -437,7 +437,13 @@ def stitch_mock_shot(store: LocalStore, project_id: str, shot_id: str, chunk_art
     return artifact
 
 
-def render_comfy_ltx_shot(store: LocalStore, project_id: str, shot_id: str, renderer: str = "ComfyLTXRenderer") -> ArtifactMetadata:
+def render_comfy_ltx_shot(
+    store: LocalStore,
+    project_id: str,
+    shot_id: str,
+    renderer: str = "ComfyLTXRenderer",
+    preset: str = "preview",
+) -> ArtifactMetadata:
     project_dir = store.project_dir(project_id)
     graph = CineGraph.model_validate(store.read_json(project_dir / "cinegraph.json"))
     shot = next(s for s in graph.shots if s.shot_id == shot_id)
@@ -445,7 +451,15 @@ def render_comfy_ltx_shot(store: LocalStore, project_id: str, shot_id: str, rend
     out_dir.mkdir(parents=True, exist_ok=True)
     raw_path = out_dir / "shot.raw.mp4"
     final_path = out_dir / "shot.mp4"
-    source_seconds = min(shot.duration, 2.92)
+    source_limits = {
+        "fast": 1.35,
+        "draft": 1.35,
+        "preview": 1.75,
+        "balanced": 2.25,
+        "high": 2.92,
+        "ultra": 2.92,
+    }
+    source_seconds = min(shot.duration, source_limits.get(preset.lower(), 1.75))
     prompt = (
         f"{shot.visual_action}. {shot.purpose}. "
         f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "

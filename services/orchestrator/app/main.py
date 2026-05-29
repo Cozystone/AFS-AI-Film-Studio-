@@ -79,7 +79,16 @@ def _run_project_render_job(job_id: str, project_id: str, payload: RenderRequest
 
         job.estimated_duration_sec = max(
             20.0,
-            total_shots * (2.0 if model_renderer == "mock" else 140.0) + (total_shots * 3.0 if payload.audio else 0.0) + 12.0,
+            total_shots
+            * (
+                2.0
+                if model_renderer == "mock"
+                else {"fast": 75.0, "draft": 75.0, "preview": 95.0, "balanced": 125.0, "high": 160.0, "ultra": 210.0}.get(
+                    payload.preset.lower(), 95.0
+                )
+            )
+            + (total_shots * 3.0 if payload.audio else 0.0)
+            + 12.0,
         )
         store.save_job(job)
         update_job_progress(store, job, 0.02)
@@ -90,7 +99,7 @@ def _run_project_render_job(job_id: str, project_id: str, payload: RenderRequest
 
         for index, shot in enumerate(shots, start=1):
             if model_renderer in {"comfy", "comfy_ltx", "ltx", "ltxrenderer"}:
-                render_comfy_ltx_shot(store, project_id, shot.shot_id, renderer)
+                render_comfy_ltx_shot(store, project_id, shot.shot_id, renderer, payload.preset)
             else:
                 _render_mock_shot(project_id, graph, shot.shot_id, renderer)
             update_job_progress(store, job, 0.15 + 0.70 * (index / total_shots))
@@ -357,7 +366,7 @@ def render_shot(shot_id: str, payload: RenderRequest) -> dict:
     job = create_job(store, JobType.STITCH_SHOT, shot_id, project_id)
     if payload.renderer.lower() in {"comfy", "comfy_ltx", "ltx", "ltxrenderer"}:
         update_job_progress(store, job, 0.05)
-        shot_artifact = render_comfy_ltx_shot(store, project_id, shot_id, payload.renderer)
+        shot_artifact = render_comfy_ltx_shot(store, project_id, shot_id, payload.renderer, payload.preset)
         update_job_progress(store, job, 0.95)
         complete_job(store, job, [shot_artifact.path])
         return {
