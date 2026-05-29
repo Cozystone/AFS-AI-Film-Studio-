@@ -151,12 +151,12 @@ def build_ltx_api_prompt(
 ) -> dict[str, Any]:
     profiles = {
         "turbo": {"width": 320, "height": 192, "fps": 16, "max_frames": 33},
-        "fast": {"width": 352, "height": 192, "fps": 16, "max_frames": 41},
+        "fast": {"width": 384, "height": 216, "fps": 16, "max_frames": 41},
         "draft": {"width": 352, "height": 192, "fps": 16, "max_frames": 41},
         "preview": {"width": 384, "height": 216, "fps": 20, "max_frames": 61},
-        "balanced": {"width": 384, "height": 216, "fps": 25, "max_frames": 73},
-        "high": {"width": 384, "height": 216, "fps": 25, "max_frames": 97},
-        "ultra": {"width": 384, "height": 216, "fps": 25, "max_frames": 97},
+        "balanced": {"width": 512, "height": 288, "fps": 20, "max_frames": 73},
+        "high": {"width": 640, "height": 360, "fps": 20, "max_frames": 81},
+        "ultra": {"width": 640, "height": 360, "fps": 24, "max_frames": 97},
     }
     profile = profiles.get(preset.lower(), profiles["preview"])
     fps = int(profile["fps"])
@@ -178,7 +178,13 @@ def build_ltx_api_prompt(
             },
         },
         "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["3", 0], "text": text}},
-        "5": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["3", 0], "text": "test pattern, color bars, still image, static, distorted, ugly"}},
+        "5": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {
+                "clip": ["3", 0],
+                "text": "SMPTE bars, color bars, test pattern, calibration chart, TV test screen, static frame, still image, distorted, ugly, low quality",
+            },
+        },
         "6": {"class_type": "LTXVConditioning", "inputs": {"positive": ["4", 0], "negative": ["5", 0], "frame_rate": float(fps)}},
         "7": {"class_type": "EmptyLTXVLatentVideo", "inputs": {"width": width, "height": height, "length": frames, "batch_size": 1}},
         "8": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},

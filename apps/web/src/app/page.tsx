@@ -280,7 +280,7 @@ export default function Home() {
   const [checkpoint, setCheckpoint] = useState(checkpoints[0]);
   const [lora, setLora] = useState(loras[0]);
   const [textEncoder, setTextEncoder] = useState(textEncoders[0]);
-  const [outputQuality, setOutputQuality] = useState("turbo");
+  const [outputQuality, setOutputQuality] = useState("fast");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [clipLength, setClipLength] = useState(3);
   const [renderStyle, setRenderStyle] = useState("cinematic");
@@ -1493,10 +1493,10 @@ function estimateRenderSeconds({ checkpoint, outputQuality }: { checkpoint: stri
   if (checkpoint === "mock") return 2;
   const qualityEstimate: Record<string, number> = {
     turbo: 45,
-    fast: 65,
-    balanced: 125,
-    high: 160,
-    ultra: 210,
+    fast: 75,
+    balanced: 170,
+    high: 260,
+    ultra: 330,
   };
   return qualityEstimate[outputQuality] ?? 95;
 }

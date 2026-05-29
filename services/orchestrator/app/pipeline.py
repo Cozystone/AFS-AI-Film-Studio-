@@ -262,6 +262,31 @@ def _ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
+def _write_cinematic_placeholder_video(path: Path, duration: float, size: str = "832x480") -> bool:
+    if not _ffmpeg_available():
+        return False
+    fade_out_start = max(0.0, duration - 0.25)
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=0x101820:size={size}:rate=24:duration={duration}",
+            "-vf",
+            f"noise=alls=8:allf=t+u,fade=t=in:st=0:d=0.25,fade=t=out:st={fade_out_start:.2f}:d=0.25",
+            "-pix_fmt",
+            "yuv420p",
+            str(path),
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0 and path.exists()
+
+
 def write_placeholder_keyframes(store: LocalStore, project_id: str, shot_id: str, slots: list[str]) -> list[str]:
     paths: list[str] = []
     keyframe_dir = store.project_dir(project_id) / "shots" / shot_id / "keyframes"
@@ -291,7 +316,7 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
         prompt = (
             f"{shot.visual_action}. {shot.purpose}. "
             f"Camera: {shot.camera.get('movement', 'cinematic motion')}. "
-            "Cinematic, coherent, natural motion, detailed scene, no test pattern, no color bars."
+            "Cinematic, coherent, natural motion, detailed scene, grounded live-action footage."
         )
         try:
             render_ltx_video(
@@ -307,23 +332,7 @@ def render_mock_chunk(store: LocalStore, project_id: str, chunk_id: str, rendere
             failure_path.write_text(str(exc), encoding="utf-8")
             raise
     elif _ffmpeg_available():
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-f",
-                "lavfi",
-                "-i",
-                f"testsrc2=size=832x480:rate=24:duration={chunk.duration}",
-                "-pix_fmt",
-                "yuv420p",
-                str(video_path),
-            ],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        if result.returncode != 0 or not video_path.exists():
+        if not _write_cinematic_placeholder_video(video_path, chunk.duration):
             video_path = out_dir / "video.ffmpeg_failed.txt"
             video_path.write_text("ffmpeg failed; mock video metadata only\n", encoding="utf-8")
     else:
@@ -406,23 +415,7 @@ def stitch_mock_shot(store: LocalStore, project_id: str, shot_id: str, chunk_art
             stderr=subprocess.DEVNULL,
         )
         if result.returncode != 0 or not video_path.exists():
-            fallback = subprocess.run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-f",
-                    "lavfi",
-                    "-i",
-                    f"testsrc2=size=832x480:rate=24:duration={shot.duration}",
-                    "-pix_fmt",
-                    "yuv420p",
-                    str(video_path),
-                ],
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if fallback.returncode != 0 or not video_path.exists():
+            if not _write_cinematic_placeholder_video(video_path, shot.duration):
                 video_path = out_dir / "shot.ffmpeg_failed.txt"
                 video_path.write_text("ffmpeg failed; stitched mock shot metadata only\n", encoding="utf-8")
     else:
@@ -471,7 +464,7 @@ def render_comfy_ltx_shot(
     prompt = (
         f"{shot.visual_action}. {shot.purpose}. "
         f"Camera: {shot.camera.get('movement', 'cinematic motion')}, {shot.camera.get('shot_size', 'film shot')}. "
-        "Cinematic realistic video, coherent motion, natural lighting, no color bars, no test pattern."
+        "Cinematic realistic video, coherent motion, natural lighting, grounded live-action footage."
     )
     render_ltx_video(
         text=prompt,
@@ -544,7 +537,7 @@ def stitch_project_movie(store: LocalStore, project_id: str, renderer: str = "Mo
                 "-i",
                 str(concat_list),
                 "-vf",
-                "scale=1280:720:flags=lanczos:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24",
+                "scale=1280:720:flags=lanczos:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,unsharp=5:5:0.8:3:3:0.3",
                 "-c:v",
                 "libx264",
                 "-preset",

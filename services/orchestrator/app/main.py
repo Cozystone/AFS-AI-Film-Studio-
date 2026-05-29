@@ -83,7 +83,7 @@ def _run_project_render_job(job_id: str, project_id: str, payload: RenderRequest
             * (
                 2.0
                 if model_renderer == "mock"
-                else {"turbo": 45.0, "fast": 65.0, "draft": 75.0, "preview": 95.0, "balanced": 125.0, "high": 160.0, "ultra": 210.0}.get(
+                else {"turbo": 45.0, "fast": 75.0, "draft": 75.0, "preview": 95.0, "balanced": 170.0, "high": 260.0, "ultra": 330.0}.get(
                     payload.preset.lower(), 95.0
                 )
             )
